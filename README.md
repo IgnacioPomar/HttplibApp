@@ -43,17 +43,31 @@ This project extends [`yhirose/cpp-httplib`](https://github.com/yhirose/cpp-http
 
 #### Middlewares
 
-- API to attach middlewares to a route (`RouteInfo`).
-- Middleware storage per route in `RouteInfo`.
+- Middleware contract based on `IMiddlewareNext`:
+  - `Middleware = std::function<void(ICtx&, IMiddlewareNext&)>`
+  - Each middleware decides whether to continue the chain with `next.next()`.
+- Two middleware scopes:
+  - Global middlewares (`Router::addMiddleware(Middleware middleware)`).
+  - Route middlewares (`Router::addMiddleware(RouteInfo&, Middleware middleware)`).
+- Execution pipeline order:
+  1. Global middlewares,
+  2. Route middlewares,
+  3. Route handler.
+- Onion-style execution is supported (before/after behavior around `next.next()`).
+- Interruption is supported (if a middleware does not call `next.next()`, execution stops).
 
 #### Quality
 
 - Unit test suite using GoogleTest covering:
-  - basic routes,
-  - typed parameters,
-  - matching priorities,
+  - Basic routes,
+  - Typed parameters,
+  - Matching priorities,
   - `ANY` method behavior,
-  - edge cases.
+  - Edge cases,
+  - Middleware chain execution,
+  - Middleware interruption,
+  - Logger-like before/after flow,
+  - Protection against invalid multiple `next.next()` calls.
 
 ### 🚧 Not implemented yet
 
@@ -62,8 +76,8 @@ This project extends [`yhirose/cpp-httplib`](https://github.com/yhirose/cpp-http
 - Ultra-basic JWT support using **Botan**.
 - Custom in-house JSON library.
 - Trait-based pluggable backends for:
-  - JSON,
-  - cryptography.
+  - JSON,		
+  - Cryptography.
 - Complete server usage documentation with practical examples.
 
 ## Roadmap
