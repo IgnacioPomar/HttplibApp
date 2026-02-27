@@ -25,6 +25,9 @@ namespace ipb::http
 		GENERIC  = 255    // <param> typeless
 	};
 
+	// prototype
+	ParamType fromParamTypeString (std::string_view type_str);
+
 	/**
 	 * @brief Validate an integer parameter.
 	 * @param value The parameter value as a string.
