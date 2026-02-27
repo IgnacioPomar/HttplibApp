@@ -40,11 +40,8 @@ namespace ipb::http
 	};
 
 	// Forward declarations
-	// using Next         = std::function<void()>;
-	// using Middleware   = std::function<void (ICtx &, Next)>;
 	using Middleware   = std::function<void (ICtx &, IMiddlewareNext &)>;
 	using RouteHandler = std::function<void (ICtx &)>;
-	// class TrieNode;
 
 	struct TypedParam;
 
