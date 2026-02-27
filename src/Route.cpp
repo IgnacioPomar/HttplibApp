@@ -229,6 +229,7 @@ namespace ipb::http
 			bool addMiddleware (HttpMethod method, std::string_view pattern, Middleware middleware);
 			std::optional<std::reference_wrapper<const RouteInfo>> match (HttpMethod method, std::string_view path,
 			                                                              ICtx &context) const;
+			static void execute (const RouteInfo &routeInfo, ICtx &context);
 
 		private:
 			// Helper methods
@@ -589,6 +590,68 @@ namespace ipb::http
 		return std::nullopt;
 	}
 
+	/**
+	 * @brief Execute the middleware chain and final handler for a matched route.
+	 * @param routeInfo The RouteInfo of the matched route.
+	 * @param context The context object to pass to middleware and handler.
+	 */
+
+	void Router::Impl::execute (const RouteInfo &routeInfo, ICtx &context)
+	{
+		class MiddlewareChainIterator final : public IMiddlewareNext
+		{
+			private:
+				std::vector<Middleware>::const_iterator current_;
+				std::vector<Middleware>::const_iterator end_;
+				const RouteHandler &handler_;
+				ICtx &context_;
+				bool handler_called_ = false;
+
+			public:
+				MiddlewareChainIterator (const std::vector<Middleware> &middlewares, const RouteHandler &handler,
+				                         ICtx &context)
+				    : current_ (middlewares.begin())
+				    , end_ (middlewares.end())
+				    , handler_ (handler)
+				    , context_ (context)
+				{
+				}
+
+				void start ()
+				{
+					next();
+				}
+
+				void next () override
+				{
+					if (current_ == end_)
+					{
+						invokeHandlerOnce();
+						return;
+					}
+
+					const auto &middleware = *current_;
+					++current_;
+					middleware (context_, *this);
+				}
+
+			private:
+				void invokeHandlerOnce ()
+				{
+					if (handler_called_)
+					{
+						return;
+					}
+
+					handler_called_ = true;
+					handler_ (context_);
+				}
+		};
+
+		MiddlewareChainIterator chain (routeInfo.middlewares, routeInfo.handler, context);
+		chain.start();
+	}
+
 	// ============================================================================
 	// Router public API (delegates to Impl)
 	// ============================================================================
@@ -627,6 +690,16 @@ namespace ipb::http
 		routeInfo.middlewares.push_back (std::move (middleware));
 
 		return true;
+	}
+
+	/**
+	 * @brief Execute the middleware chain and final handler for a matched route.
+	 * @param routeInfo The RouteInfo of the matched route.
+	 * @param context The context object to pass to middleware and handler.
+	 */
+	void Router::execute (const RouteInfo &routeInfo, ICtx &context) const
+	{
+		impl_->execute (routeInfo, context);
 	}
 
 	/**

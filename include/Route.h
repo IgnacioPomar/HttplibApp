@@ -20,15 +20,29 @@
 
 namespace ipb::http
 {
+	/**
+	 * @brief Interface for context objects passed to route handlers and middleware.
+	 */
 	class ICtx
 	{
 		public:
 			virtual void setParam (std::string_view name, std::string_view value) = 0;
 	};
 
+	/**
+	 * @brief Interface for the "next" function passed to middleware, allowing them to control the flow of execution.
+	 */
+	class IMiddlewareNext
+	{
+		public:
+			virtual ~IMiddlewareNext () = default;
+			virtual void next ()        = 0;
+	};
+
 	// Forward declarations
-	using Next         = std::function<void()>;
-	using Middleware   = std::function<void (ICtx &, Next)>;
+	// using Next         = std::function<void()>;
+	// using Middleware   = std::function<void (ICtx &, Next)>;
+	using Middleware   = std::function<void (ICtx &, IMiddlewareNext &)>;
 	using RouteHandler = std::function<void (ICtx &)>;
 	// class TrieNode;
 
@@ -91,6 +105,12 @@ namespace ipb::http
 			 * Convert HTTP method string to enum
 			 */
 			HAPP_API static HttpMethod fromMethodString (std::string_view method);
+
+			/**
+			 * Execute route middleware chain and final handler.
+			 * Middleware controls flow by calling (or not calling) `next`.
+			 */
+			HAPP_API void execute (const RouteInfo &routeInfo, ICtx &context) const;
 
 		private:
 			// The data is contained in a PIMPL (Pointer to Implementation)

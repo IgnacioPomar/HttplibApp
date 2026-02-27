@@ -110,9 +110,9 @@ TEST_F (RouterTest, AddRouteWithMiddleware)
 	auto &route = router.add (HttpMethod::GET, "/protected", dummyHandler);
 
 	router.addMiddleware (route,
-	                      [] (ICtx &ctx, Next next)
+	                      [] (ICtx &, IMiddlewareNext &next)
 	                      {
-		                      next();
+		                      next.next();
 	                      });
 
 	auto result = router.match (HttpMethod::GET, "/protected", ctx);
@@ -413,9 +413,9 @@ TEST_F (RouterTest, AddMiddlewareToExistingRoute)
 	auto &route = router.add (HttpMethod::GET, "/users", dummyHandler);
 
 	bool added = router.addMiddleware (route,
-	                                   [] (ICtx &ctx, Next next)
+	                                   [] (ICtx &, IMiddlewareNext &next)
 	                                   {
-		                                   next();
+		                                   next.next();
 	                                   });
 
 	EXPECT_TRUE (added);
@@ -513,4 +513,97 @@ TEST_F (RouterTest, Base64IdParameterHasPriorityOverString)
 	ASSERT_TRUE (result.has_value());
 	EXPECT_EQ (result.value().get().pattern, "/tokens/<id:base64id>");
 	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv");
+}
+
+TEST_F (RouterTest, MiddlewareChainContinuesAndExecutesHandler)
+{
+	std::vector<std::string> calls;
+
+	auto &route = router.add (HttpMethod::GET, "/pipeline",
+	                          [&] (ICtx &)
+	                          {
+		                          calls.push_back ("handler");
+	                          });
+
+	router.addMiddleware (route,
+	                      [&] (ICtx &, IMiddlewareNext &next)
+	                      {
+		                      calls.push_back ("mw1.before");
+		                      next.next();
+		                      calls.push_back ("mw1.after");
+	                      });
+
+	router.addMiddleware (route,
+	                      [&] (ICtx &, IMiddlewareNext &next)
+	                      {
+		                      calls.push_back ("mw2.before");
+		                      next.next();
+		                      calls.push_back ("mw2.after");
+	                      });
+
+	auto result = router.match (HttpMethod::GET, "/pipeline", ctx);
+	ASSERT_TRUE (result.has_value());
+
+	router.execute (result.value().get(), ctx);
+
+	const std::vector<std::string> expected = {"mw1.before", "mw2.before", "handler", "mw2.after", "mw1.after"};
+	EXPECT_EQ (calls, expected);
+}
+
+TEST_F (RouterTest, MiddlewareCanInterruptChain)
+{
+	std::vector<std::string> calls;
+
+	auto &route = router.add (HttpMethod::GET, "/blocked",
+	                          [&] (ICtx &)
+	                          {
+		                          calls.push_back ("handler");
+	                          });
+
+	router.addMiddleware (route,
+	                      [&] (ICtx &, IMiddlewareNext &)
+	                      {
+		                      calls.push_back ("mw.block");
+		                      // Intentionally no next.next(): chain stops here.
+	                      });
+
+	router.addMiddleware (route,
+	                      [&] (ICtx &, IMiddlewareNext &next)
+	                      {
+		                      calls.push_back ("mw2.before");
+		                      next.next();
+	                      });
+
+	auto result = router.match (HttpMethod::GET, "/blocked", ctx);
+	ASSERT_TRUE (result.has_value());
+
+	router.execute (result.value().get(), ctx);
+
+	const std::vector<std::string> expected = {"mw.block"};
+	EXPECT_EQ (calls, expected);
+}
+
+TEST_F (RouterTest, MiddlewareCallingNextTwiceDoesNotRunHandlerTwice)
+{
+	int handler_calls = 0;
+
+	auto &route = router.add (HttpMethod::GET, "/double-next",
+	                          [&] (ICtx &)
+	                          {
+		                          ++handler_calls;
+	                          });
+
+	router.addMiddleware (route,
+	                      [&] (ICtx &, IMiddlewareNext &next)
+	                      {
+		                      next.next();
+		                      next.next();    // Should be ignored by guard.
+	                      });
+
+	auto result = router.match (HttpMethod::GET, "/double-next", ctx);
+	ASSERT_TRUE (result.has_value());
+
+	router.execute (result.value().get(), ctx);
+
+	EXPECT_EQ (handler_calls, 1);
 }
