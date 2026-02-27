@@ -471,3 +471,46 @@ TEST_F (RouterTest, MultipleRoutersIndependent)
 	EXPECT_TRUE (result1.has_value());
 	EXPECT_FALSE (result2.has_value());    // router1 no debe tener /posts
 }
+
+TEST_F (RouterTest, AddRouteWithBase64IdParameter)
+{
+	router.add (HttpMethod::GET, "/resources/<id:base64id>", dummyHandler);
+
+	auto result = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStUv", ctx);
+
+	ASSERT_TRUE (result.has_value());
+	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv");
+
+	// Invalid value (contains '+' which is not Base64URL)
+	ctx.clear();
+	auto no_match_invalid_char = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStU+", ctx);
+	EXPECT_FALSE (no_match_invalid_char.has_value());
+
+	// Invalid value (wrong length)
+	ctx.clear();
+	auto no_match_invalid_len = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStU", ctx);
+	EXPECT_FALSE (no_match_invalid_len.has_value());
+}
+
+TEST_F (RouterTest, AddRouteWithBase64IdParameter_Padded)
+{
+	router.add (HttpMethod::GET, "/resources/<id:base64id>", dummyHandler);
+
+	auto result = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStUv==", ctx);
+
+	ASSERT_TRUE (result.has_value());
+	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv==");
+}
+
+TEST_F (RouterTest, Base64IdParameterHasPriorityOverString)
+{
+	router.add (HttpMethod::GET, "/tokens/<id:base64id>", dummyHandler);
+	router.add (HttpMethod::GET, "/tokens/<value:string>", dummyHandler);
+
+	// Base64URL-like token should match base64id before string
+	auto result = router.match (HttpMethod::GET, "/tokens/AbCdEfGhIjKlMnOpQrStUv", ctx);
+
+	ASSERT_TRUE (result.has_value());
+	EXPECT_EQ (result.value()->pattern, "/tokens/<id:base64id>");
+	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv");
+}

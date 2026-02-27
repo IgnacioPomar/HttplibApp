@@ -7,8 +7,8 @@ Extension for `cpp-httplib` focused on web services, adding route-based dispatch
 This project extends [`yhirose/cpp-httplib`](https://github.com/yhirose/cpp-httplib) by adding:
 
 - A **routing** system for web services.
-- Per-route **middlewares**.
-- A foundation to evolve into a more complete HTTP framework.
+- Per-route and global **middlewares**.
+- Keep it as simple as possible, with a focus on performance and ease of use.
 
 ## Current status
 
@@ -35,6 +35,7 @@ This project extends [`yhirose/cpp-httplib`](https://github.com/yhirose/cpp-http
 - Generic: `<id>`.
 - Typed:
   - `<id:int>`
+  - `<id:base64id>` (UUID represented as Base64URL, with or without `==` padding)
   - `<name:string>`
   - `<id:uuid>`
   - `<amount:float>`

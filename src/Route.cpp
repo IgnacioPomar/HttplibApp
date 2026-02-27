@@ -17,12 +17,167 @@ namespace ipb::http
 	// Parameter Types
 	enum class ParamType : uint8_t
 	{
-		INT     = 0,     // <param:int>
-		STRING  = 1,     // <param:string>
-		UUID    = 2,     // <param:uuid>
-		FLOAT   = 3,     // <param:float>
-		GENERIC = 255    // <param> typeless
+		INT      = 0,     // <param:int>
+		BASE64ID = 1,     // <param:base64id> (UUID encoded as Base64URL)
+		STRING   = 2,     // <param:string>
+		UUID     = 3,     // <param:uuid>
+		FLOAT    = 4,     // <param:float>
+		GENERIC  = 255    // <param> typeless
 	};
+
+	/**
+	 * @brief Validate an integer parameter.
+	 * @param value The parameter value as a string.
+	 * @return True if the value is a valid integer, false otherwise.
+	 */
+	static bool validateIntParam (std::string_view value)
+	{
+		if (value.empty())
+		{
+			return false;
+		}
+
+		size_t start = 0;
+		if (value [0] == '-' || value [0] == '+')
+		{
+			start = 1;
+		}
+
+		if (start >= value.size())
+		{
+			return false;
+		}
+
+		for (size_t i = start; i < value.size(); ++i)
+		{
+			if (!std::isdigit (static_cast<unsigned char> (value [i])))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * @brief Validate a Base64URL UUID parameter.
+	 * @param value The parameter value as a string.
+	 * @return True if the value is a valid Base64URL UUID, false otherwise.
+	 */
+	static bool validateBase64IdParam (std::string_view value)
+	{
+		// Base64URL UUID format:
+		// - unpadded: 22 chars
+		// - padded:   24 chars ending with "=="
+		if (value.size() != 22 && value.size() != 24)
+		{
+			return false;
+		}
+
+		size_t payload_len = value.size();
+
+		if (value.size() == 24)
+		{
+			if (value [22] != '=' || value [23] != '=')
+			{
+				return false;
+			}
+			payload_len = 22;
+		}
+
+		for (size_t i = 0; i < payload_len; ++i)
+		{
+			const unsigned char c = static_cast<unsigned char> (value [i]);
+			const bool is_alnum   = std::isalnum (c) != 0;
+			const bool is_urlsafe = (c == '-') || (c == '_');
+
+			if (!is_alnum && !is_urlsafe)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * @brief Validate a UUID parameter.
+	 * @param value The parameter value as a string.
+	 * @return True if the value is a valid UUID, false otherwise.
+	 */
+	static bool validateUuidParam (std::string_view value)
+	{
+		// UUID format: 8-4-4-4-12 hexadecimal characters separated by hyphens.
+		if (value.size() != 36)
+		{
+			return false;
+		}
+
+		for (size_t i = 0; i < value.size(); ++i)
+		{
+			const char c = value [i];
+			if (i == 8 || i == 13 || i == 18 || i == 23)
+			{
+				if (c != '-')
+				{
+					return false;
+				}
+			}
+			else if (!std::isxdigit (static_cast<unsigned char> (c)))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * @brief Validate a float parameter.
+	 * @param value The parameter value as a string.
+	 * @return True if the value is a valid float, false otherwise.
+	 */
+	static bool validateFloatParam (std::string_view value)
+	{
+		// Float format: optional sign, digits, optional decimal point, more digits.
+		if (value.empty())
+		{
+			return false;
+		}
+
+		size_t i = 0;
+		if (value [i] == '-' || value [i] == '+')
+		{
+			++i;
+		}
+
+		if (i >= value.size())
+		{
+			return false;
+		}
+
+		bool has_digit = false;
+		bool has_dot   = false;
+
+		for (; i < value.size(); ++i)
+		{
+			const char c = value [i];
+			if (std::isdigit (static_cast<unsigned char> (c)))
+			{
+				has_digit = true;
+			}
+			else if (c == '.' && !has_dot)
+			{
+				has_dot = true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		return has_digit;
+	}
 
 	// Forward declaration
 	struct TypedParam;
@@ -109,114 +264,23 @@ namespace ipb::http
 
 	bool TypedParam::validate (std::string_view value) const
 	{
-		size_t start   = 0;
-		bool has_digit = false;
-		bool has_dot   = false;
-		size_t i       = 0;
-
 		switch (type)
 		{
-		case ParamType::INT:
-			// Validate that all characters are digits (optionally with sign)
-			if (value.empty())
-			{
-				return false;
-			}
+		case ParamType::INT: return validateIntParam (value);
 
-			if (value [0] == '-' || value [0] == '+')
-			{
-				start = 1;
-			}
+		case ParamType::BASE64ID: return validateBase64IdParam (value);
 
-			if (start >= value.size())
-			{
-				return false;
-			}
+		case ParamType::UUID: return validateUuidParam (value);
 
-			for (i = start; i < value.size(); ++i)
-			{
-				if (!std::isdigit (static_cast<unsigned char> (value [i])))
-				{
-					return false;
-				}
-			}
-			return true;
-
-		case ParamType::UUID:
-			// UUID format: 8-4-4-4-12 hexadecimal characters separated by hyphens
-			// Example: 550e8400-e29b-41d4-a716-446655440000
-			if (value.size() != 36)
-			{
-				return false;
-			}
-
-			{
-				// Block to avoid C2360 error ('start' initialization bypassed)
-				for (i = 0; i < value.size(); ++i)
-				{
-					char c = value [i];
-					if (i == 8 || i == 13 || i == 18 || i == 23)
-					{
-						if (c != '-')
-						{
-							return false;
-						}
-					}
-					else
-					{
-						if (!std::isxdigit (static_cast<unsigned char> (c)))
-						{
-							return false;
-						}
-					}
-				}
-				return true;
-			}
-
-		case ParamType::FLOAT:
-			// Validate float format: optional sign, digits, optional decimal point, more digits
-			if (value.empty())
-			{
-				return false;
-			}
-
-			i = 0;
-			if (value [i] == '-' || value [i] == '+')
-			{
-				i++;
-			}
-
-			if (i >= value.size())
-			{
-				return false;
-			}
-
-			for (; i < value.size(); ++i)
-			{
-				char c = value [i];
-				if (std::isdigit (static_cast<unsigned char> (c)))
-				{
-					has_digit = true;
-				}
-				else if (c == '.' && !has_dot)
-				{
-					has_dot = true;
-				}
-				else
-				{
-					return false;
-				}
-			}
-
-			return has_digit;
+		case ParamType::FLOAT: return validateFloatParam (value);
 
 		case ParamType::STRING:
-			// String accepts any non-empty value
+			// String accepts any non-empty value.
 			return !value.empty();
 
 		case ParamType::GENERIC:
 		default:
-			// Generic accepts everything
+			// Generic accepts everything.
 			return true;
 		}
 	}
@@ -367,6 +431,10 @@ namespace ipb::http
 				if (type_str == "int")
 				{
 					result.type = ParamType::INT;
+				}
+				else if (type_str == "base64id")
+				{
+					result.type = ParamType::BASE64ID;
 				}
 				else if (type_str == "string")
 				{
