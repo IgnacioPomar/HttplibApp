@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36915.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HttplibApp", "projects\HttplibApp.vcxproj", "{AE996BD9-05FF-4F37-B0BB-07942FFCEA4D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HttplibAppTester", "projects\HttplibAppTester.vcxproj", "{BCCF4A9E-880C-4AEB-A23C-39090B74DFC5}"
+	ProjectSection(ProjectDependencies) = postProject
+		{AE996BD9-05FF-4F37-B0BB-07942FFCEA4D} = {AE996BD9-05FF-4F37-B0BB-07942FFCEA4D}
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AE996BD9-05FF-4F37-B0BB-07942FFCEA4D}.Debug|x64.ActiveCfg = Debug|x64
+		{AE996BD9-05FF-4F37-B0BB-07942FFCEA4D}.Debug|x64.Build.0 = Debug|x64
+		{AE996BD9-05FF-4F37-B0BB-07942FFCEA4D}.Release|x64.ActiveCfg = Release|x64
+		{AE996BD9-05FF-4F37-B0BB-07942FFCEA4D}.Release|x64.Build.0 = Release|x64
+		{BCCF4A9E-880C-4AEB-A23C-39090B74DFC5}.Debug|x64.ActiveCfg = Debug|x64
+		{BCCF4A9E-880C-4AEB-A23C-39090B74DFC5}.Debug|x64.Build.0 = Debug|x64
+		{BCCF4A9E-880C-4AEB-A23C-39090B74DFC5}.Release|x64.ActiveCfg = Release|x64
+		{BCCF4A9E-880C-4AEB-A23C-39090B74DFC5}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {98D2C4EA-1116-445A-82FF-8B75134B9864}
+	EndGlobalSection
+EndGlobal
