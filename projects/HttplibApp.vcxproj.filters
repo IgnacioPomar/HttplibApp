@@ -21,12 +21,18 @@
     <ClInclude Include="..\include\Route.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\Jwt.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\httplib_app_dllmain.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\src\Route.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\Jwt.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>

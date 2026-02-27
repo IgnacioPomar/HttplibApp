@@ -87,10 +87,12 @@
   <ItemGroup>
     <ClInclude Include="..\include\httplib_app_exportcfg.h" />
     <ClInclude Include="..\include\Route.h" />
+    <ClInclude Include="..\include\Jwt.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\httplib_app_dllmain.cpp" />
     <ClCompile Include="..\src\Route.cpp" />
+    <ClCompile Include="..\src\Jwt.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
