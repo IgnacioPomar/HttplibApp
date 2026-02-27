@@ -237,12 +237,20 @@ namespace ipb::http
 	// ============================================================================
 	// TrieNode implementation
 	// ============================================================================
-
+	/**
+	 * @brief Check if the TrieNode has any handler (for any method).
+	 * @return True if there is at least one handler, false otherwise.
+	 */
 	bool TrieNode::hasAnyHandler () const noexcept
 	{
 		return !handlers.empty();
 	}
 
+	/**
+	 * @brief Get the handler for a specific HTTP method, with fallback to ANY.
+	 * @param method The HTTP method to look for.
+	 * @return An optional containing the RouteInfo pointer if found, or std::nullopt if not found.
+	 */
 	std::optional<const RouteInfo *> TrieNode::getHandler (HttpMethod method) const
 	{
 		// 1. Specific method
@@ -262,6 +270,11 @@ namespace ipb::http
 	// TypedParam implementation
 	// ============================================================================
 
+	/**
+	 * @brief Validate a parameter value against the TypedParam's type.
+	 * @param value The parameter value as a string.
+	 * @return True if the value is valid for the type, false otherwise.
+	 */
 	bool TypedParam::validate (std::string_view value) const
 	{
 		switch (type)
@@ -288,7 +301,13 @@ namespace ipb::http
 	// ============================================================================
 	// Router::Impl implementation
 	// ============================================================================
-
+	/**
+	 * @brief Add a new route to the Trie.
+	 * @param method The HTTP method for the route.
+	 * @param pattern The route pattern (e.g., "/users/<id:int>").
+	 * @param handler The route handler function.
+	 * @return A reference to the RouteInfo of the added route.
+	 */
 	RouteInfo &Router::Impl::add (HttpMethod method, std::string_view pattern, RouteHandler handler)
 	{
 		auto segments = splitPath (pattern);
@@ -308,6 +327,13 @@ namespace ipb::http
 		return current->handlers [method];
 	}
 
+	/**
+	 * @brief Add middleware to an existing route.
+	 * @param method The HTTP method of the route.
+	 * @param pattern The route pattern.
+	 * @param middleware The middleware function to add.
+	 * @return True if the middleware was added successfully, false if the route was not found.
+	 */
 	bool Router::Impl::addMiddleware (HttpMethod method, std::string_view pattern, Middleware middleware)
 	{
 		if (auto route = findRoute (method, pattern))
@@ -318,6 +344,13 @@ namespace ipb::http
 		return false;
 	}
 
+	/**
+	 * @brief Match an incoming request path to a route and extract parameters.
+	 * @param method The HTTP method of the incoming request.
+	 * @param path The request path to match (e.g., "/users/123").
+	 * @param context The context object to store extracted parameters.
+	 * @return An optional containing a pointer to the matched RouteInfo if found, or std::nullopt if no match.
+	 */
 	std::optional<const RouteInfo *> Router::Impl::match (HttpMethod method, std::string_view path, ICtx &context) const
 	{
 		auto segments           = splitPath (path);
@@ -369,6 +402,11 @@ namespace ipb::http
 		return current->getHandler (method);
 	}
 
+	/**
+	 * @brief Split a path into segments, removing leading/trailing slashes.
+	 * @param path The input path (e.g., "/users/123/").
+	 * @return A vector of path segments (e.g., ["users", "123"]).
+	 */
 	std::vector<std::string_view> Router::Impl::splitPath (std::string_view path)
 	{
 		std::vector<std::string_view> segments;
@@ -411,6 +449,11 @@ namespace ipb::http
 		return segments;
 	}
 
+	/**
+	 * @brief Parse a path segment to determine if it's a literal or a parameter, and extract its name and type.
+	 * @param segment The path segment to parse (e.g., "users", "<id:int>").
+	 * @return A ParsedSegment struct containing the parsing result.
+	 */
 	ParsedSegment Router::Impl::parseSegment (std::string_view segment)
 	{
 		ParsedSegment result;
@@ -425,33 +468,8 @@ namespace ipb::http
 			// Does it have a type? <name:type>
 			if (auto colon_pos = segment.find (':'); colon_pos != std::string_view::npos)
 			{
-				result.name   = segment.substr (0, colon_pos);
-				auto type_str = segment.substr (colon_pos + 1);
-
-				if (type_str == "int")
-				{
-					result.type = ParamType::INT;
-				}
-				else if (type_str == "base64id")
-				{
-					result.type = ParamType::BASE64ID;
-				}
-				else if (type_str == "string")
-				{
-					result.type = ParamType::STRING;
-				}
-				else if (type_str == "uuid")
-				{
-					result.type = ParamType::UUID;
-				}
-				else if (type_str == "float")
-				{
-					result.type = ParamType::FLOAT;
-				}
-				else
-				{
-					result.type = ParamType::GENERIC;
-				}
+				result.name = std::string (segment.substr (0, colon_pos));
+				result.type = fromParamTypeString (segment.substr (colon_pos + 1));
 			}
 			else
 			{
@@ -469,6 +487,12 @@ namespace ipb::http
 		return result;
 	}
 
+	/**
+	 * @brief Get or create a TrieNode for a given segment under the current node.
+	 * @param current The current TrieNode to search under.
+	 * @param segment The path segment to get or create a node for.
+	 * @return A reference to the TrieNode corresponding to the segment.
+	 */
 	TrieNode &Router::Impl::getOrCreateNode (TrieNode *current, std::string_view segment)
 	{
 		auto parsed = parseSegment (segment);
@@ -502,6 +526,12 @@ namespace ipb::http
 		return inserted_it->next;
 	}
 
+	/**
+	 * @brief Find a route in the Trie based on the method and pattern.
+	 * @param method The HTTP method of the route to find.
+	 * @param pattern The route pattern to find (e.g., "/users/<id:int>").
+	 * @return An optional containing a pointer to the RouteInfo if found, or std::nullopt if not found.
+	 */
 	std::optional<RouteInfo *> Router::Impl::findRoute (HttpMethod method, std::string_view pattern)
 	{
 		auto segments = splitPath (pattern);
@@ -564,11 +594,24 @@ namespace ipb::http
 
 	Router &Router::operator= (Router &&) noexcept = default;
 
+	/**
+	 * @brief Add a new route to the router.
+	 * @param method The HTTP method for the route.
+	 * @param pattern The route pattern (e.g., "/users/<id:int>").
+	 * @param handler The route handler function.
+	 * @return A reference to the RouteInfo of the added route.
+	 */
 	RouteInfo &Router::add (HttpMethod method, std::string_view pattern, RouteHandler handler)
 	{
 		return impl_->add (method, pattern, std::move (handler));
 	}
 
+	/**
+	 * @brief Add middleware to an existing route.
+	 * @param routeInfo The RouteInfo of the route to add middleware to.
+	 * @param middleware The middleware function to add.
+	 * @return True if the middleware was added successfully, false if the route was not found.
+	 */
 	bool Router::addMiddleware (RouteInfo &routeInfo, Middleware middleware)
 	{
 		routeInfo.middlewares.push_back (std::move (middleware));
@@ -576,11 +619,23 @@ namespace ipb::http
 		return true;
 	}
 
+	/**
+	 * @brief Match an incoming request path to a route and extract parameters.
+	 * @param method The HTTP method of the incoming request.
+	 * @param path The request path to match (e.g., "/users/123").
+	 * @param context The context object to store extracted parameters.
+	 * @return An optional containing a pointer to the matched RouteInfo if found, or std::nullopt if no match.
+	 */
 	std::optional<const RouteInfo *> Router::match (HttpMethod method, std::string_view path, ICtx &context) const
 	{
 		return impl_->match (method, path, context);
 	}
 
+	/**
+	 * @brief Convert an HTTP method string to the corresponding HttpMethod enum value.
+	 * @param method The HTTP method as a string (e.g., "GET", "POST").
+	 * @return The corresponding HttpMethod enum value, or HttpMethod::GET as a default fallback for invalid input.
+	 */
 	HttpMethod Router::fromMethodString (std::string_view method)
 	{
 		static const std::unordered_map<std::string_view, HttpMethod> method_map = {
@@ -599,6 +654,24 @@ namespace ipb::http
 		}
 
 		return HttpMethod::GET;    // Default fallback
+	}
+
+	static ParamType fromParamTypeString (std::string_view type_str)
+	{
+		static const std::unordered_map<std::string_view, ParamType> type_map = {
+		    {"int",      ParamType::INT     },
+		    {"base64id", ParamType::BASE64ID},
+		    {"string",   ParamType::STRING  },
+		    {"uuid",     ParamType::UUID    },
+		    {"float",    ParamType::FLOAT   }
+        };
+
+		if (auto it = type_map.find (type_str); it != type_map.end())
+		{
+			return it->second;
+		}
+
+		return ParamType::GENERIC;
 	}
 
 }    // namespace ipb::http
