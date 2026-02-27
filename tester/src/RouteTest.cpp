@@ -80,8 +80,8 @@ TEST_F (RouterTest, AddSimpleRoute)
 	auto result = router.match (HttpMethod::GET, "/users", ctx);
 
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->pattern, "/users");
-	EXPECT_EQ (result.value()->method, HttpMethod::GET);
+	EXPECT_EQ (result.value().get().pattern, "/users");
+	EXPECT_EQ (result.value().get().method, HttpMethod::GET);
 	EXPECT_TRUE (ctx.empty());
 }
 
@@ -92,7 +92,7 @@ TEST_F (RouterTest, AddRootPath)
 	auto result = router.match (HttpMethod::GET, "/", ctx);
 
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->pattern, "/");
+	EXPECT_EQ (result.value().get().pattern, "/");
 }
 
 TEST_F (RouterTest, AddNestedRoute)
@@ -102,7 +102,7 @@ TEST_F (RouterTest, AddNestedRoute)
 	auto result = router.match (HttpMethod::GET, "/api/v1/users/list", ctx);
 
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->pattern, "/api/v1/users/list");
+	EXPECT_EQ (result.value().get().pattern, "/api/v1/users/list");
 }
 
 TEST_F (RouterTest, AddRouteWithMiddleware)
@@ -118,7 +118,7 @@ TEST_F (RouterTest, AddRouteWithMiddleware)
 	auto result = router.match (HttpMethod::GET, "/protected", ctx);
 
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->middlewares.size(), 1);
+	EXPECT_EQ (result.value().get().middlewares.size(), 1);
 }
 
 // ============================================================================
@@ -143,10 +143,10 @@ TEST_F (RouterTest, AddSamePathDifferentMethods)
 	ASSERT_TRUE (put_result.has_value());
 	ASSERT_TRUE (delete_result.has_value());
 
-	EXPECT_EQ (get_result.value()->method, HttpMethod::GET);
-	EXPECT_EQ (post_result.value()->method, HttpMethod::POST);
-	EXPECT_EQ (put_result.value()->method, HttpMethod::PUT);
-	EXPECT_EQ (delete_result.value()->method, HttpMethod::DELETE_);
+	EXPECT_EQ (get_result.value().get().method, HttpMethod::GET);
+	EXPECT_EQ (post_result.value().get().method, HttpMethod::POST);
+	EXPECT_EQ (put_result.value().get().method, HttpMethod::PUT);
+	EXPECT_EQ (delete_result.value().get().method, HttpMethod::DELETE_);
 }
 
 TEST_F (RouterTest, AddMethodANY)
@@ -176,9 +176,9 @@ TEST_F (RouterTest, SpecificMethodOverridesANY)
 	ASSERT_TRUE (post_result.has_value());
 
 	// POST debe usar la ruta específica, no ANY
-	EXPECT_EQ (post_result.value()->method, HttpMethod::POST);
+	EXPECT_EQ (post_result.value().get().method, HttpMethod::POST);
 	// GET debe usar ANY
-	EXPECT_EQ (get_result.value()->method, HttpMethod::ANY);
+	EXPECT_EQ (get_result.value().get().method, HttpMethod::ANY);
 }
 
 // ============================================================================
@@ -292,7 +292,7 @@ TEST_F (RouterTest, LiteralHasPriorityOverParameter)
 	auto result = router.match (HttpMethod::GET, "/users/new", ctx);
 
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->pattern, "/users/new");
+	EXPECT_EQ (result.value().get().pattern, "/users/new");
 	EXPECT_TRUE (ctx.empty());    // No debe capturar "new" como parámetro
 }
 
@@ -304,7 +304,7 @@ TEST_F (RouterTest, IntParameterHasPriorityOverString)
 	// Número debe matchear con int primero
 	auto int_result = router.match (HttpMethod::GET, "/users/123", ctx);
 	ASSERT_TRUE (int_result.has_value());
-	EXPECT_EQ (int_result.value()->pattern, "/users/<id:int>");
+	EXPECT_EQ (int_result.value().get().pattern, "/users/<id:int>");
 	EXPECT_EQ (ctx.get ("id").value(), "123");
 
 	ctx.clear();
@@ -312,7 +312,7 @@ TEST_F (RouterTest, IntParameterHasPriorityOverString)
 	// String no numérico debe matchear con string
 	auto string_result = router.match (HttpMethod::GET, "/users/john", ctx);
 	ASSERT_TRUE (string_result.has_value());
-	EXPECT_EQ (string_result.value()->pattern, "/users/<alias:string>");
+	EXPECT_EQ (string_result.value().get().pattern, "/users/<alias:string>");
 	EXPECT_EQ (ctx.get ("alias").value(), "john");
 }
 
@@ -324,7 +324,7 @@ TEST_F (RouterTest, TypedParameterHasPriorityOverGeneric)
 	auto result = router.match (HttpMethod::GET, "/items/456", ctx);
 
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->pattern, "/items/<id:int>");
+	EXPECT_EQ (result.value().get().pattern, "/items/<id:int>");
 	EXPECT_EQ (ctx.get ("id").value(), "456");
 }
 
@@ -422,7 +422,7 @@ TEST_F (RouterTest, AddMiddlewareToExistingRoute)
 
 	auto result = router.match (HttpMethod::GET, "/users", ctx);
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->middlewares.size(), 1);
+	EXPECT_EQ (result.value().get().middlewares.size(), 1);
 }
 
 // ============================================================================
@@ -511,6 +511,6 @@ TEST_F (RouterTest, Base64IdParameterHasPriorityOverString)
 	auto result = router.match (HttpMethod::GET, "/tokens/AbCdEfGhIjKlMnOpQrStUv", ctx);
 
 	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value()->pattern, "/tokens/<id:base64id>");
+	EXPECT_EQ (result.value().get().pattern, "/tokens/<id:base64id>");
 	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv");
 }

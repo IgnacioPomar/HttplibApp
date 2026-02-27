@@ -84,8 +84,8 @@ namespace ipb::http
 			/**
 			 * Match route and extract parameters
 			 */
-			HAPP_API std::optional<const RouteInfo *> match (HttpMethod method, std::string_view path,
-			                                                 ICtx &context) const;
+			HAPP_API std::optional<std::reference_wrapper<const RouteInfo>>
+			    match (HttpMethod method, std::string_view path, ICtx &context) const;
 
 			/**
 			 * Convert HTTP method string to enum

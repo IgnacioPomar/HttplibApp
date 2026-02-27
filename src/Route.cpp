@@ -26,7 +26,7 @@ namespace ipb::http
 	};
 
 	// prototype
-	ParamType fromParamTypeString (std::string_view type_str);
+	static ParamType fromParamTypeString (std::string_view type_str);
 
 	/**
 	 * @brief Validate an integer parameter.
@@ -194,7 +194,7 @@ namespace ipb::http
 			std::map<HttpMethod, RouteInfo> handlers;
 
 			bool hasAnyHandler () const noexcept;
-			std::optional<const RouteInfo *> getHandler (HttpMethod method) const;
+			std::optional<std::reference_wrapper<const RouteInfo>> getHandler (HttpMethod method) const;
 	};
 
 	// TypedParam - Typed parameter in the Trie
@@ -227,7 +227,8 @@ namespace ipb::http
 			// Public API implementation
 			RouteInfo &add (HttpMethod method, std::string_view pattern, RouteHandler handler);
 			bool addMiddleware (HttpMethod method, std::string_view pattern, Middleware middleware);
-			std::optional<const RouteInfo *> match (HttpMethod method, std::string_view path, ICtx &context) const;
+			std::optional<std::reference_wrapper<const RouteInfo>> match (HttpMethod method, std::string_view path,
+			                                                              ICtx &context) const;
 
 		private:
 			// Helper methods
@@ -254,17 +255,17 @@ namespace ipb::http
 	 * @param method The HTTP method to look for.
 	 * @return An optional containing the RouteInfo pointer if found, or std::nullopt if not found.
 	 */
-	std::optional<const RouteInfo *> TrieNode::getHandler (HttpMethod method) const
+	std::optional<std::reference_wrapper<const RouteInfo>> TrieNode::getHandler (HttpMethod method) const
 	{
 		// 1. Specific method
 		if (auto it = handlers.find (method); it != handlers.end())
 		{
-			return &it->second;
+			return std::cref (it->second);
 		}
 		// 2. Fallback to ANY
 		if (auto it = handlers.find (HttpMethod::ANY); it != handlers.end())
 		{
-			return &it->second;
+			return std::cref (it->second);
 		}
 		return std::nullopt;
 	}
@@ -354,10 +355,11 @@ namespace ipb::http
 	 * @param context The context object to store extracted parameters.
 	 * @return An optional containing a pointer to the matched RouteInfo if found, or std::nullopt if no match.
 	 */
-	std::optional<const RouteInfo *> Router::Impl::match (HttpMethod method, std::string_view path, ICtx &context) const
+	std::optional<std::reference_wrapper<const RouteInfo>>
+	    Router::Impl::match (HttpMethod method, std::string_view path, ICtx &context) const
 	{
 		auto segments           = splitPath (path);
-		const TrieNode *current = &root_;    // Changed to const TrieNode *
+		const TrieNode *current = &root_;
 
 		// Traverse the Trie
 		for (const auto &segment : segments)
@@ -392,7 +394,8 @@ namespace ipb::http
 				continue;
 			}
 
-			// No match found
+			// No child node matches this path segment (neither literal nor typed parameter).
+			// This means the full route cannot be matched, so stop immediately.
 			return std::nullopt;
 		}
 
@@ -402,6 +405,8 @@ namespace ipb::http
 			return std::nullopt;
 		}
 
+		// All path segments were matched successfully.
+		// Now resolve the handler in the final node (specific method or ANY fallback).
 		return current->getHandler (method);
 	}
 
@@ -437,15 +442,17 @@ namespace ipb::http
 		while (start < path.size())
 		{
 			size_t end = path.find ('/', start);
+			// If no more '/' is found, add the last segment and break
 			if (end == std::string_view::npos)
 			{
 				segments.emplace_back (path.substr (start));
 				break;
 			}
+			// Otherwise, add the segment between 'start' and 'end' to segments
 			else
 			{
 				segments.emplace_back (path.substr (start, end - start));
-				start = end + 1;
+				start = end + 1;    // Move start to the next position after '/'
 			}
 		}
 
@@ -629,7 +636,8 @@ namespace ipb::http
 	 * @param context The context object to store extracted parameters.
 	 * @return An optional containing a pointer to the matched RouteInfo if found, or std::nullopt if no match.
 	 */
-	std::optional<const RouteInfo *> Router::match (HttpMethod method, std::string_view path, ICtx &context) const
+	std::optional<std::reference_wrapper<const RouteInfo>> Router::match (HttpMethod method, std::string_view path,
+	                                                                      ICtx &context) const
 	{
 		return impl_->match (method, path, context);
 	}
