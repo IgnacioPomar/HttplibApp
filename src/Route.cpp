@@ -223,13 +223,15 @@ namespace ipb::http
 	{
 		public:
 			TrieNode root_;
+			std::vector<Middleware> middlewares;    // Global middlewares
 
 			// Public API implementation
 			RouteInfo &add (HttpMethod method, std::string_view pattern, RouteHandler handler);
+			bool addMiddleware (Middleware middleware);
 			bool addMiddleware (HttpMethod method, std::string_view pattern, Middleware middleware);
 			std::optional<std::reference_wrapper<const RouteInfo>> match (HttpMethod method, std::string_view path,
 			                                                              ICtx &context) const;
-			static void execute (const RouteInfo &routeInfo, ICtx &context);
+			void execute (const RouteInfo &routeInfo, ICtx &context) const;
 
 		private:
 			// Helper methods
@@ -347,6 +349,18 @@ namespace ipb::http
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * @brief Add middleware to an existing route.
+	 * @param middleware The middleware function to add.
+	 * @return True if the middleware was added successfully, false if the route was not found.
+	 */
+	bool Router::Impl::addMiddleware (Middleware middleware)
+	{
+		middlewares.push_back (std::move (middleware));
+
+		return true;
 	}
 
 	/**
@@ -596,22 +610,18 @@ namespace ipb::http
 	 * @param context The context object to pass to middleware and handler.
 	 */
 
-	void Router::Impl::execute (const RouteInfo &routeInfo, ICtx &context)
+	void Router::Impl::execute (const RouteInfo &routeInfo, ICtx &context) const
 	{
 		class MiddlewareChainIterator final : public IMiddlewareNext
 		{
-			private:
-				std::vector<Middleware>::const_iterator current_;
-				std::vector<Middleware>::const_iterator end_;
-				const RouteHandler &handler_;
-				ICtx &context_;
-				bool handler_called_ = false;
-
 			public:
-				MiddlewareChainIterator (const std::vector<Middleware> &middlewares, const RouteHandler &handler,
+				MiddlewareChainIterator (const std::vector<Middleware> &globalMiddlewares,
+				                         const std::vector<Middleware> &routeMiddlewares, const RouteHandler &handler,
 				                         ICtx &context)
-				    : current_ (middlewares.begin())
-				    , end_ (middlewares.end())
+				    : current_ (globalMiddlewares.begin())
+				    , globalEnd_ (globalMiddlewares.end())
+				    , routeEnd_ (routeMiddlewares.end())
+				    , routeBegin_ (routeMiddlewares.begin())
 				    , handler_ (handler)
 				    , context_ (context)
 				{
@@ -624,7 +634,13 @@ namespace ipb::http
 
 				void next () override
 				{
-					if (current_ == end_)
+					if (!using_route_middlewares_ && current_ == globalEnd_)
+					{
+						using_route_middlewares_ = true;
+						current_                 = routeBegin_;
+					}
+
+					if (using_route_middlewares_ && current_ == routeEnd_)
 					{
 						invokeHandlerOnce();
 						return;
@@ -646,9 +662,19 @@ namespace ipb::http
 					handler_called_ = true;
 					handler_ (context_);
 				}
+
+				std::vector<Middleware>::const_iterator current_;
+				std::vector<Middleware>::const_iterator globalEnd_;
+				std::vector<Middleware>::const_iterator routeEnd_;
+				std::vector<Middleware>::const_iterator routeBegin_;
+
+				const RouteHandler &handler_;
+				ICtx &context_;
+				bool using_route_middlewares_ = false;
+				bool handler_called_          = false;
 		};
 
-		MiddlewareChainIterator chain (routeInfo.middlewares, routeInfo.handler, context);
+		MiddlewareChainIterator chain (middlewares, routeInfo.middlewares, routeInfo.handler, context);
 		chain.start();
 	}
 
@@ -680,7 +706,7 @@ namespace ipb::http
 	}
 
 	/**
-	 * @brief Add middleware to an existing route.
+	 * @brief Add middleware to a specific route.
 	 * @param routeInfo The RouteInfo of the route to add middleware to.
 	 * @param middleware The middleware function to add.
 	 * @return True if the middleware was added successfully, false if the route was not found.
@@ -690,6 +716,16 @@ namespace ipb::http
 		routeInfo.middlewares.push_back (std::move (middleware));
 
 		return true;
+	}
+
+	/**
+	 * @brief Add a global middleware to the router.
+	 * @param middleware The middleware function to add.
+	 * @return True if the middleware was added successfully.
+	 */
+	bool Router::addMiddleware (Middleware middleware)
+	{
+		return impl_->addMiddleware (std::move (middleware));
 	}
 
 	/**

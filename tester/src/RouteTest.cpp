@@ -607,3 +607,80 @@ TEST_F (RouterTest, MiddlewareCallingNextTwiceDoesNotRunHandlerTwice)
 
 	EXPECT_EQ (handler_calls, 1);
 }
+
+TEST_F (RouterTest, GlobalMiddlewaresRunBeforeRouteMiddlewares)
+{
+	std::vector<std::string> calls;
+
+	router.addMiddleware (
+	    [&] (ICtx &, IMiddlewareNext &next)
+	    {
+		    calls.push_back ("g1.before");
+		    next.next();
+		    calls.push_back ("g1.after");
+	    });
+
+	router.addMiddleware (
+	    [&] (ICtx &, IMiddlewareNext &next)
+	    {
+		    calls.push_back ("g2.before");
+		    next.next();
+		    calls.push_back ("g2.after");
+	    });
+
+	auto &route = router.add (HttpMethod::GET, "/global-order",
+	                          [&] (ICtx &)
+	                          {
+		                          calls.push_back ("handler");
+	                          });
+
+	router.addMiddleware (route,
+	                      [&] (ICtx &, IMiddlewareNext &next)
+	                      {
+		                      calls.push_back ("r1.before");
+		                      next.next();
+		                      calls.push_back ("r1.after");
+	                      });
+
+	auto result = router.match (HttpMethod::GET, "/global-order", ctx);
+	ASSERT_TRUE (result.has_value());
+
+	router.execute (result.value().get(), ctx);
+
+	const std::vector<std::string> expected = {"g1.before", "g2.before", "r1.before", "handler",
+	                                           "r1.after",  "g2.after",  "g1.after"};
+	EXPECT_EQ (calls, expected);
+}
+
+TEST_F (RouterTest, GlobalMiddlewareCanInterruptChain)
+{
+	std::vector<std::string> calls;
+
+	router.addMiddleware (
+	    [&] (ICtx &, IMiddlewareNext &)
+	    {
+		    calls.push_back ("g.block");
+		    // No next.next(): stop the whole chain.
+	    });
+
+	auto &route = router.add (HttpMethod::GET, "/global-block",
+	                          [&] (ICtx &)
+	                          {
+		                          calls.push_back ("handler");
+	                          });
+
+	router.addMiddleware (route,
+	                      [&] (ICtx &, IMiddlewareNext &next)
+	                      {
+		                      calls.push_back ("r1.before");
+		                      next.next();
+	                      });
+
+	auto result = router.match (HttpMethod::GET, "/global-block", ctx);
+	ASSERT_TRUE (result.has_value());
+
+	router.execute (result.value().get(), ctx);
+
+	const std::vector<std::string> expected = {"g.block"};
+	EXPECT_EQ (calls, expected);
+}

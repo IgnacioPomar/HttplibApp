@@ -91,7 +91,12 @@ namespace ipb::http
 			HAPP_API RouteInfo &add (HttpMethod method, std::string_view pattern, RouteHandler handler);
 
 			/**
-			 * Add middleware to an existing route (there are also global middlewares, so this is an "exception")
+			 * Add a global middleware executed for all routes.
+			 */
+			HAPP_API bool addMiddleware (Middleware middleware);
+
+			/**
+			 * Add middleware to an existing route.
 			 */
 			HAPP_API bool addMiddleware (RouteInfo &routeInfo, Middleware middleware);
 
