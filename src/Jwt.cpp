@@ -9,7 +9,12 @@
 #include <algorithm>
 #include <cmath>
 #include <ctime>
+#include <filesystem>
 #include <utility>
+
+#if defined(_WIN32)
+#	include <windows.h>
+#endif
 
 namespace ipb::http::jwt
 {
@@ -166,6 +171,30 @@ namespace ipb::http::jwt
 			}
 
 			return makeError (ErrorCode::Ok);
+		}
+
+		static std::filesystem::path getExecutableDir ()
+		{
+#if defined(_WIN32)
+			std::vector<wchar_t> buffer (MAX_PATH);
+			DWORD len = 0;
+			for (;;)
+			{
+				len = GetModuleFileNameW (nullptr, buffer.data(), static_cast<DWORD> (buffer.size()));
+				if (len == 0)
+				{
+					return std::filesystem::current_path();
+				}
+				if (len < buffer.size() - 1)
+				{
+					break;
+				}
+				buffer.resize (buffer.size() * 2);
+			}
+			return std::filesystem::path (std::wstring (buffer.data(), len)).parent_path();
+#else
+			return std::filesystem::current_path();
+#endif
 		}
 	}    // namespace
 
@@ -335,6 +364,11 @@ namespace ipb::http::jwt
 	{
 		claims_ [std::move (name)] = std::move (value);
 		return *this;
+	}
+
+	TokenBuilder &TokenBuilder::claim (std::string name, const char *value)
+	{
+		return claim (std::move (name), std::string_view (value != nullptr ? value : ""));
 	}
 
 	TokenBuilder &TokenBuilder::claim (std::string name, std::string value)
@@ -517,6 +551,46 @@ namespace ipb::http::jwt
 	Error Jwt::removeKey (std::string_view kid)
 	{
 		return impl_->crypto_.removeKey (kid);
+	}
+
+	Error Jwt::ensureKeyPairInBinaryDir (std::string_view kid, JwtAlg alg, std::string_view privateKeyFileName,
+	                                     std::string_view publicKeyFileName, JwtUse use, std::string_view params)
+	{
+		if (privateKeyFileName.empty() || publicKeyFileName.empty())
+		{
+			return makeError (ErrorCode::IOError, "Key file names cannot be empty");
+		}
+
+		const auto baseDir     = getExecutableDir();
+		const auto privatePath = baseDir / std::string (privateKeyFileName);
+		const auto publicPath  = baseDir / std::string (publicKeyFileName);
+
+		const bool privateExists = std::filesystem::exists (privatePath);
+		const bool publicExists  = std::filesystem::exists (publicPath);
+
+		if (privateExists && publicExists)
+		{
+			auto error = impl_->crypto_.loadPrivateKeyFromPemFile (kid, privatePath.string());
+			if (!isOk (error))
+			{
+				return error;
+			}
+			return impl_->crypto_.loadPublicKeyFromPemFile (kid, publicPath.string(), use);
+		}
+
+		auto error = impl_->crypto_.generateKeyPair (kid, alg, params);
+		if (!isOk (error))
+		{
+			return error;
+		}
+
+		error = impl_->crypto_.savePrivateKeyToPemFile (kid, privatePath.string());
+		if (!isOk (error))
+		{
+			return error;
+		}
+
+		return impl_->crypto_.savePublicKeyToPemFile (kid, publicPath.string(), use);
 	}
 
 	Error Jwt::verify (std::string_view token, Verifier &outVerifier) const

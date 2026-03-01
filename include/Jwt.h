@@ -146,31 +146,31 @@ namespace ipb::http::jwt
 
 	class Jwt;
 
-	class HAPP_API Verifier
+	class  Verifier
 	{
 		public:
-			Verifier ();
-			~Verifier ();
-			Verifier (const Verifier &other);
-			Verifier &operator= (const Verifier &other);
-			Verifier (Verifier &&other) noexcept;
-			Verifier &operator= (Verifier &&other) noexcept;
+			HAPP_API Verifier ();
+			HAPP_API ~Verifier ();
+			HAPP_API Verifier (const Verifier &other);
+			HAPP_API Verifier &operator= (const Verifier &other);
+			HAPP_API Verifier (Verifier &&other) noexcept;
+			HAPP_API Verifier &operator= (Verifier &&other) noexcept;
 
-			bool ok () const noexcept;
-			const Error &error () const noexcept;
+			HAPP_API bool ok () const noexcept;
+			HAPP_API const Error &error () const noexcept;
 
-			std::string_view rawToken () const noexcept;
-			std::string_view rawHeaderJson () const noexcept;
-			std::string_view rawPayloadJson () const noexcept;
+			HAPP_API std::string_view rawToken () const noexcept;
+			HAPP_API std::string_view rawHeaderJson () const noexcept;
+			HAPP_API std::string_view rawPayloadJson () const noexcept;
 
-			const HeaderMap &header () const noexcept;
-			const ClaimMap &claims () const noexcept;
+			HAPP_API const HeaderMap &header () const noexcept;
+			HAPP_API const ClaimMap &claims () const noexcept;
 
-			bool hasClaim (std::string_view name) const noexcept;
-			std::optional<std::string> claimString (std::string_view name) const;
-			std::optional<int64_t> claimInt (std::string_view name) const;
-			std::optional<double> claimDouble (std::string_view name) const;
-			std::optional<bool> claimBool (std::string_view name) const;
+			HAPP_API bool hasClaim (std::string_view name) const noexcept;
+			HAPP_API std::optional<std::string> claimString (std::string_view name) const;
+			HAPP_API std::optional<int64_t> claimInt (std::string_view name) const;
+			HAPP_API std::optional<double> claimDouble (std::string_view name) const;
+			HAPP_API std::optional<bool> claimBool (std::string_view name) const;
 
 		private:
 			friend class Jwt;
@@ -179,35 +179,36 @@ namespace ipb::http::jwt
 			std::unique_ptr<Impl> impl_;
 	};
 
-	class HAPP_API TokenBuilder
+	class  TokenBuilder
 	{
 		public:
-			explicit TokenBuilder (const Jwt &jwt);
+			HAPP_API explicit TokenBuilder (const Jwt &jwt);
 
-			TokenBuilder &alg (JwtAlg value);
-			TokenBuilder &kid (std::string value);
-			TokenBuilder &type (std::string value = "JWT");
+			HAPP_API TokenBuilder &alg (JwtAlg value);
+			HAPP_API TokenBuilder &kid (std::string value);
+			HAPP_API TokenBuilder &type (std::string value = "JWT");
 
-			TokenBuilder &claim (std::string name, ClaimValue value);
-			TokenBuilder &claim (std::string name, std::string value);
-			TokenBuilder &claim (std::string name, std::string_view value);
-			TokenBuilder &claim (std::string name, int64_t value);
-			TokenBuilder &claim (std::string name, double value);
-			TokenBuilder &claim (std::string name, bool value);
+			HAPP_API TokenBuilder &claim (std::string name, ClaimValue value);
+			HAPP_API TokenBuilder &claim (std::string name, const char *value);
+			HAPP_API TokenBuilder &claim (std::string name, std::string value);
+			HAPP_API TokenBuilder &claim (std::string name, std::string_view value);
+			HAPP_API TokenBuilder &claim (std::string name, int64_t value);
+			HAPP_API TokenBuilder &claim (std::string name, double value);
+			HAPP_API TokenBuilder &claim (std::string name, bool value);
 
-			TokenBuilder &issuer (std::string value);
-			TokenBuilder &subject (std::string value);
-			TokenBuilder &audience (std::string value);
-			TokenBuilder &jwtId (std::string value);
-			TokenBuilder &expiresAt (int64_t epochSeconds);
-			TokenBuilder &notBefore (int64_t epochSeconds);
-			TokenBuilder &issuedAt (int64_t epochSeconds);
+			HAPP_API TokenBuilder &issuer (std::string value);
+			HAPP_API TokenBuilder &subject (std::string value);
+			HAPP_API TokenBuilder &audience (std::string value);
+			HAPP_API TokenBuilder &jwtId (std::string value);
+			HAPP_API TokenBuilder &expiresAt (int64_t epochSeconds);
+			HAPP_API TokenBuilder &notBefore (int64_t epochSeconds);
+			HAPP_API TokenBuilder &issuedAt (int64_t epochSeconds);
 
-			Error sign (std::string &outToken) const;
+			HAPP_API Error sign (std::string &outToken) const;
 
-			const HeaderMap &header () const noexcept;
-			const ClaimMap &claims () const noexcept;
-			void clearClaims () noexcept;
+			HAPP_API const HeaderMap &header () const noexcept;
+			HAPP_API const ClaimMap &claims () const noexcept;
+			HAPP_API void clearClaims () noexcept;
 
 		private:
 			const Jwt &jwt_;
@@ -215,36 +216,41 @@ namespace ipb::http::jwt
 			ClaimMap claims_;
 	};
 
-	class HAPP_API Jwt
+	class  Jwt
 	{
 		public:
-			explicit Jwt (ICryptoProvider &cryptoProvider, IJsonProvider &jsonProvider,
+			HAPP_API explicit Jwt (ICryptoProvider &cryptoProvider, IJsonProvider &jsonProvider,
 			              EngineOptions options = {});
-			~Jwt();
+			HAPP_API~Jwt();
 
 			Jwt (const Jwt &)            = delete;
 			Jwt &operator= (const Jwt &) = delete;
-			Jwt (Jwt &&) noexcept;
-			Jwt &operator= (Jwt &&) noexcept;
+			HAPP_API Jwt (Jwt &&) noexcept;
+			HAPP_API Jwt &operator= (Jwt &&) noexcept;
 
-			Error loadPrivateKeyFromPemFile (std::string_view kid, std::string_view pemPath);
-			Error loadPublicKeyFromPemFile (std::string_view kid, std::string_view pemPath, JwtUse use = JwtUse::Sig);
-			Error loadCertificateFromPemFile (std::string_view kid, std::string_view pemPath);
-			Error savePrivateKeyToPemFile (std::string_view kid, std::string_view pemPath);
-			Error savePublicKeyToPemFile (std::string_view kid, std::string_view pemPath, JwtUse use = JwtUse::Sig);
-			Error generateKeyPair (std::string_view kid, JwtAlg alg, std::string_view params = {});
-			Error removeKey (std::string_view kid);
+			HAPP_API Error loadPrivateKeyFromPemFile (std::string_view kid, std::string_view pemPath);
+			HAPP_API Error loadPublicKeyFromPemFile (std::string_view kid, std::string_view pemPath, JwtUse use = JwtUse::Sig);
+			HAPP_API Error loadCertificateFromPemFile (std::string_view kid, std::string_view pemPath);
+			HAPP_API Error savePrivateKeyToPemFile (std::string_view kid, std::string_view pemPath);
+			HAPP_API Error savePublicKeyToPemFile (std::string_view kid, std::string_view pemPath, JwtUse use = JwtUse::Sig);
+			HAPP_API Error generateKeyPair (std::string_view kid, JwtAlg alg, std::string_view params = {});
+			HAPP_API Error removeKey (std::string_view kid);
+			HAPP_API Error ensureKeyPairInBinaryDir (std::string_view kid, JwtAlg alg,
+			                                         std::string_view privateKeyFileName = "jwt.private.pem",
+			                                         std::string_view publicKeyFileName  = "jwt.public.pem",
+			                                         JwtUse use = JwtUse::Sig,
+			                                         std::string_view params = {});
 
-			Error verify (std::string_view token, Verifier &outVerifier) const;
-			TokenBuilder token () const;
+			HAPP_API Error verify (std::string_view token, Verifier &outVerifier) const;
+			HAPP_API TokenBuilder token () const;
 
-			const EngineOptions &options () const noexcept;
-			void setOptions (EngineOptions options);
+			HAPP_API const EngineOptions &options () const noexcept;
+			HAPP_API void setOptions (EngineOptions options);
 
-			ICryptoProvider &crypto () noexcept;
-			const ICryptoProvider &crypto () const noexcept;
-			IJsonProvider &json () noexcept;
-			const IJsonProvider &json () const noexcept;
+			HAPP_API ICryptoProvider &crypto () noexcept;
+			HAPP_API const ICryptoProvider &crypto () const noexcept;
+			HAPP_API IJsonProvider &json () noexcept;
+			HAPP_API const IJsonProvider &json () const noexcept;
 
 		private:
 			class Impl;

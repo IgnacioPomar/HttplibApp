@@ -12,19 +12,35 @@
 #include <charconv>
 #include <cmath>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 #include <unordered_set>
+
+#if defined(_WIN32)
+#	include <windows.h>
+#endif
 
 namespace ipb::http::jwt
 {
 	class FakeCryptoProvider final : public ICryptoProvider
 	{
 		public:
+			int loadPrivateCalls = 0;
+			int loadPublicCalls  = 0;
+			int savePrivateCalls = 0;
+			int savePublicCalls  = 0;
+			int generateCalls    = 0;
+			std::string lastPrivatePath;
+			std::string lastPublicPath;
+
 			Error loadPrivateKeyFromPemFile (std::string_view kid, std::string_view pemPath) override
 			{
-				if (pemPath.empty())
+				++loadPrivateCalls;
+				lastPrivatePath = std::string (pemPath);
+				if (pemPath.empty() || !std::filesystem::exists (std::filesystem::path (pemPath)))
 				{
-					return {.code = ErrorCode::IOError, .message = "empty path"};
+					return {.code = ErrorCode::IOError, .message = "private key path missing"};
 				}
 				keys_.insert (std::string (kid));
 				return {.code = ErrorCode::Ok, .message = {}};
@@ -32,9 +48,11 @@ namespace ipb::http::jwt
 
 			Error loadPublicKeyFromPemFile (std::string_view kid, std::string_view pemPath, JwtUse) override
 			{
-				if (pemPath.empty())
+				++loadPublicCalls;
+				lastPublicPath = std::string (pemPath);
+				if (pemPath.empty() || !std::filesystem::exists (std::filesystem::path (pemPath)))
 				{
-					return {.code = ErrorCode::IOError, .message = "empty path"};
+					return {.code = ErrorCode::IOError, .message = "public key path missing"};
 				}
 				keys_.insert (std::string (kid));
 				return {.code = ErrorCode::Ok, .message = {}};
@@ -52,24 +70,41 @@ namespace ipb::http::jwt
 
 			Error savePrivateKeyToPemFile (std::string_view kid, std::string_view pemPath) override
 			{
+				++savePrivateCalls;
+				lastPrivatePath = std::string (pemPath);
 				if (pemPath.empty() || keys_.find (std::string (kid)) == keys_.end())
 				{
 					return {.code = ErrorCode::KeyNotFound, .message = "key not found"};
 				}
+				std::ofstream out (std::filesystem::path (pemPath), std::ios::binary | std::ios::trunc);
+				if (!out)
+				{
+					return {.code = ErrorCode::IOError, .message = "cannot write private key"};
+				}
+				out << "private-key";
 				return {.code = ErrorCode::Ok, .message = {}};
 			}
 
 			Error savePublicKeyToPemFile (std::string_view kid, std::string_view pemPath, JwtUse) override
 			{
+				++savePublicCalls;
+				lastPublicPath = std::string (pemPath);
 				if (pemPath.empty() || keys_.find (std::string (kid)) == keys_.end())
 				{
 					return {.code = ErrorCode::KeyNotFound, .message = "key not found"};
 				}
+				std::ofstream out (std::filesystem::path (pemPath), std::ios::binary | std::ios::trunc);
+				if (!out)
+				{
+					return {.code = ErrorCode::IOError, .message = "cannot write public key"};
+				}
+				out << "public-key";
 				return {.code = ErrorCode::Ok, .message = {}};
 			}
 
 			Error generateKeyPair (std::string_view kid, JwtAlg, std::string_view) override
 			{
+				++generateCalls;
 				keys_.insert (std::string (kid));
 				return {.code = ErrorCode::Ok, .message = {}};
 			}
@@ -308,6 +343,28 @@ namespace ipb::http::jwt
 			FakeJsonProvider json;
 			EngineOptions options;
 			Jwt jwt {crypto, json, options};
+
+			static std::filesystem::path binaryDir ()
+			{
+#if defined(_WIN32)
+				std::vector<wchar_t> buffer (MAX_PATH);
+				DWORD len = 0;
+				for (;;)
+				{
+					len = GetModuleFileNameW (nullptr, buffer.data(), static_cast<DWORD> (buffer.size()));
+					if (len == 0)
+					{
+						break;
+					}
+					if (len < buffer.size() - 1)
+					{
+						return std::filesystem::path (std::wstring (buffer.data(), len)).parent_path();
+					}
+					buffer.resize (buffer.size() * 2);
+				}
+#endif
+				return std::filesystem::current_path();
+			}
 	};
 
 	TEST_F (JwtTester, SignAndVerifySuccess)
@@ -384,6 +441,77 @@ namespace ipb::http::jwt
 		ASSERT_EQ (jwt.generateKeyPair ("k1", JwtAlg::HS256).code, ErrorCode::Ok);
 		EXPECT_EQ (jwt.savePrivateKeyToPemFile ("k1", "k1.priv.pem").code, ErrorCode::Ok);
 		EXPECT_EQ (jwt.savePublicKeyToPemFile ("k1", "k1.pub.pem").code, ErrorCode::Ok);
+	}
+
+	TEST_F (JwtTester, ClaimWithCStringLiteralIsStoredAsString)
+	{
+		ASSERT_EQ (jwt.generateKeyPair ("k1", JwtAlg::HS256).code, ErrorCode::Ok);
+
+		std::string token;
+		ASSERT_EQ (jwt.token()
+		               .alg (JwtAlg::HS256)
+		               .kid ("k1")
+		               .claim ("sample", "test")
+		               .expiresAt (static_cast<int64_t> (std::time (nullptr)) + 3600)
+		               .sign (token)
+		               .code,
+		           ErrorCode::Ok);
+
+		Verifier verifier;
+		ASSERT_EQ (jwt.verify (token, verifier).code, ErrorCode::Ok);
+		EXPECT_EQ (verifier.claimString ("sample").value_or (""), "test");
+	}
+
+	TEST_F (JwtTester, EnsureKeyPairInBinaryDirCreatesFilesWhenMissing)
+	{
+		const auto privFile = "jwt-test-create.private.pem";
+		const auto pubFile  = "jwt-test-create.public.pem";
+		const auto privPath = binaryDir() / privFile;
+		const auto pubPath  = binaryDir() / pubFile;
+		std::error_code ec;
+		std::filesystem::remove (privPath, ec);
+		std::filesystem::remove (pubPath, ec);
+
+		auto error = jwt.ensureKeyPairInBinaryDir ("k-startup", JwtAlg::HS256, privFile, pubFile);
+		ASSERT_EQ (error.code, ErrorCode::Ok);
+		EXPECT_TRUE (std::filesystem::exists (privPath));
+		EXPECT_TRUE (std::filesystem::exists (pubPath));
+		EXPECT_EQ (crypto.generateCalls, 1);
+		EXPECT_EQ (crypto.savePrivateCalls, 1);
+		EXPECT_EQ (crypto.savePublicCalls, 1);
+		EXPECT_EQ (crypto.loadPrivateCalls, 0);
+		EXPECT_EQ (crypto.loadPublicCalls, 0);
+
+		std::filesystem::remove (privPath, ec);
+		std::filesystem::remove (pubPath, ec);
+	}
+
+	TEST_F (JwtTester, EnsureKeyPairInBinaryDirLoadsFilesWhenPresent)
+	{
+		const auto privFile = "jwt-test-load.private.pem";
+		const auto pubFile  = "jwt-test-load.public.pem";
+		const auto privPath = binaryDir() / privFile;
+		const auto pubPath  = binaryDir() / pubFile;
+		{
+			std::ofstream privOut (privPath, std::ios::binary | std::ios::trunc);
+			std::ofstream pubOut (pubPath, std::ios::binary | std::ios::trunc);
+			ASSERT_TRUE (privOut.good());
+			ASSERT_TRUE (pubOut.good());
+		}
+
+		auto error = jwt.ensureKeyPairInBinaryDir ("k-startup", JwtAlg::HS256, privFile, pubFile);
+		ASSERT_EQ (error.code, ErrorCode::Ok);
+		EXPECT_EQ (crypto.generateCalls, 0);
+		EXPECT_EQ (crypto.savePrivateCalls, 0);
+		EXPECT_EQ (crypto.savePublicCalls, 0);
+		EXPECT_EQ (crypto.loadPrivateCalls, 1);
+		EXPECT_EQ (crypto.loadPublicCalls, 1);
+		EXPECT_EQ (std::filesystem::path (crypto.lastPrivatePath).filename().string(), privFile);
+		EXPECT_EQ (std::filesystem::path (crypto.lastPublicPath).filename().string(), pubFile);
+
+		std::error_code ec;
+		std::filesystem::remove (privPath, ec);
+		std::filesystem::remove (pubPath, ec);
 	}
 
 }    // namespace ipb::http::jwt
