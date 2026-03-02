@@ -29,5 +29,8 @@
     <ClInclude Include="..\tester\src\TestUtils.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="..\tester\src\JwtTestProviders.h">
+      <Filter>include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

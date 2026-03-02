@@ -16,6 +16,7 @@
     <ClCompile Include="..\tester\src\jwtTester.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\tester\src\JwtTestProviders.h" />
     <ClInclude Include="..\tester\src\TestUtils.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
