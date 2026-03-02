@@ -235,11 +235,6 @@ namespace ipb::http::jwt
 			HAPP_API Error savePublicKeyToPemFile (std::string_view kid, std::string_view pemPath, JwtUse use = JwtUse::Sig);
 			HAPP_API Error generateKeyPair (std::string_view kid, JwtAlg alg, std::string_view params = {});
 			HAPP_API Error removeKey (std::string_view kid);
-			HAPP_API Error ensureKeyPairInBinaryDir (std::string_view kid, JwtAlg alg,
-			                                         std::string_view privateKeyFileName = "jwt.private.pem",
-			                                         std::string_view publicKeyFileName  = "jwt.public.pem",
-			                                         JwtUse use = JwtUse::Sig,
-			                                         std::string_view params = {});
 
 			HAPP_API Error verify (std::string_view token, Verifier &outVerifier) const;
 			HAPP_API TokenBuilder token () const;

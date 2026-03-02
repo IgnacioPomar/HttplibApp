@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "Jwt.h"
+#include "TestUtils.h"
 
 #include <algorithm>
 #include <charconv>
@@ -16,10 +17,6 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
-
-#if defined(_WIN32)
-#	include <windows.h>
-#endif
 
 namespace ipb::http::jwt
 {
@@ -343,28 +340,6 @@ namespace ipb::http::jwt
 			FakeJsonProvider json;
 			EngineOptions options;
 			Jwt jwt {crypto, json, options};
-
-			static std::filesystem::path binaryDir ()
-			{
-#if defined(_WIN32)
-				std::vector<wchar_t> buffer (MAX_PATH);
-				DWORD len = 0;
-				for (;;)
-				{
-					len = GetModuleFileNameW (nullptr, buffer.data(), static_cast<DWORD> (buffer.size()));
-					if (len == 0)
-					{
-						break;
-					}
-					if (len < buffer.size() - 1)
-					{
-						return std::filesystem::path (std::wstring (buffer.data(), len)).parent_path();
-					}
-					buffer.resize (buffer.size() * 2);
-				}
-#endif
-				return std::filesystem::current_path();
-			}
 	};
 
 	TEST_F (JwtTester, SignAndVerifySuccess)
@@ -466,13 +441,14 @@ namespace ipb::http::jwt
 	{
 		const auto privFile = "jwt-test-create.private.pem";
 		const auto pubFile  = "jwt-test-create.public.pem";
-		const auto privPath = binaryDir() / privFile;
-		const auto pubPath  = binaryDir() / pubFile;
+		const auto binDir   = testutil::executableDir();
+		const auto privPath = binDir / privFile;
+		const auto pubPath  = binDir / pubFile;
 		std::error_code ec;
 		std::filesystem::remove (privPath, ec);
 		std::filesystem::remove (pubPath, ec);
 
-		auto error = jwt.ensureKeyPairInBinaryDir ("k-startup", JwtAlg::HS256, privFile, pubFile);
+		auto error = testutil::ensureJwtKeyPairInDir (jwt, "k-startup", JwtAlg::HS256, binDir, privFile, pubFile);
 		ASSERT_EQ (error.code, ErrorCode::Ok);
 		EXPECT_TRUE (std::filesystem::exists (privPath));
 		EXPECT_TRUE (std::filesystem::exists (pubPath));
@@ -490,8 +466,9 @@ namespace ipb::http::jwt
 	{
 		const auto privFile = "jwt-test-load.private.pem";
 		const auto pubFile  = "jwt-test-load.public.pem";
-		const auto privPath = binaryDir() / privFile;
-		const auto pubPath  = binaryDir() / pubFile;
+		const auto binDir   = testutil::executableDir();
+		const auto privPath = binDir / privFile;
+		const auto pubPath  = binDir / pubFile;
 		{
 			std::ofstream privOut (privPath, std::ios::binary | std::ios::trunc);
 			std::ofstream pubOut (pubPath, std::ios::binary | std::ios::trunc);
@@ -499,7 +476,7 @@ namespace ipb::http::jwt
 			ASSERT_TRUE (pubOut.good());
 		}
 
-		auto error = jwt.ensureKeyPairInBinaryDir ("k-startup", JwtAlg::HS256, privFile, pubFile);
+		auto error = testutil::ensureJwtKeyPairInDir (jwt, "k-startup", JwtAlg::HS256, binDir, privFile, pubFile);
 		ASSERT_EQ (error.code, ErrorCode::Ok);
 		EXPECT_EQ (crypto.generateCalls, 0);
 		EXPECT_EQ (crypto.savePrivateCalls, 0);
