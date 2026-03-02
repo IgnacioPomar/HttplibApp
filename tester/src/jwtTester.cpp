@@ -16,6 +16,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 #include <unordered_set>
 
 namespace ipb::http::jwt
@@ -30,6 +31,17 @@ namespace ipb::http::jwt
 			int generateCalls    = 0;
 			std::string lastPrivatePath;
 			std::string lastPublicPath;
+
+			void resetCounters ()
+			{
+				loadPrivateCalls = 0;
+				loadPublicCalls  = 0;
+				savePrivateCalls = 0;
+				savePublicCalls  = 0;
+				generateCalls    = 0;
+				lastPrivatePath.clear();
+				lastPublicPath.clear();
+			}
 
 			Error loadPrivateKeyFromPemFile (std::string_view kid, std::string_view pemPath) override
 			{
@@ -336,21 +348,44 @@ namespace ipb::http::jwt
 	class JwtTester : public ::testing::Test
 	{
 		protected:
+			static constexpr const char *kKid        = "k-startup";
+			static constexpr const char *kPrivFile   = "jwt.private.pem";
+			static constexpr const char *kPublicFile = "jwt.public.pem";
+
 			FakeCryptoProvider crypto;
 			FakeJsonProvider json;
 			EngineOptions options;
 			Jwt jwt {crypto, json, options};
+
+			static void SetUpTestSuite ()
+			{
+				FakeCryptoProvider bootstrapCrypto;
+				FakeJsonProvider bootstrapJson;
+				EngineOptions bootstrapOptions;
+				Jwt bootstrapJwt {bootstrapCrypto, bootstrapJson, bootstrapOptions};
+
+				auto error = testutil::ensureJwtKeyPairInDir (bootstrapJwt, kKid, JwtAlg::HS256,
+				                                              testutil::executableDir(), kPrivFile, kPublicFile);
+				if (error.code != ErrorCode::Ok)
+				{
+					throw std::runtime_error ("Failed to bootstrap JWT key pair for tests: " + error.message);
+				}
+			}
+
+			void SetUp () override
+			{
+				auto error = testutil::ensureJwtKeyPairInDir (jwt, kKid, JwtAlg::HS256, testutil::executableDir(),
+				                                              kPrivFile, kPublicFile);
+				ASSERT_EQ (error.code, ErrorCode::Ok);
+			}
 	};
 
 	TEST_F (JwtTester, SignAndVerifySuccess)
 	{
-		auto keyError = jwt.generateKeyPair ("k1", JwtAlg::HS256);
-		ASSERT_EQ (keyError.code, ErrorCode::Ok);
-
 		std::string token;
 		auto signError = jwt.token()
 		                     .alg (JwtAlg::HS256)
-		                     .kid ("k1")
+		                     .kid (kKid)
 		                     .issuer ("auth0")
 		                     .subject ("user-1")
 		                     .claim ("sample", "test")
@@ -369,10 +404,8 @@ namespace ipb::http::jwt
 
 	TEST_F (JwtTester, VerifyFailsOnSignatureMismatch)
 	{
-		ASSERT_EQ (jwt.generateKeyPair ("k1", JwtAlg::HS256).code, ErrorCode::Ok);
-
 		std::string token;
-		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid ("k1").claim ("sample", "test").sign (token).code,
+		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid (kKid).claim ("sample", "test").sign (token).code,
 		           ErrorCode::Ok);
 		ASSERT_FALSE (token.empty());
 		token.back() = (token.back() == 'A') ? 'B' : 'A';
@@ -387,10 +420,9 @@ namespace ipb::http::jwt
 	{
 		options.policy.expectedIss = "auth0";
 		jwt.setOptions (options);
-		ASSERT_EQ (jwt.generateKeyPair ("k1", JwtAlg::HS256).code, ErrorCode::Ok);
 
 		std::string token;
-		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid ("k1").issuer ("other").sign (token).code, ErrorCode::Ok);
+		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid (kKid).issuer ("other").sign (token).code, ErrorCode::Ok);
 
 		Verifier verifier;
 		auto verifyError = jwt.verify (token, verifier);
@@ -399,12 +431,10 @@ namespace ipb::http::jwt
 
 	TEST_F (JwtTester, RemoveKeyInvalidatesFutureVerification)
 	{
-		ASSERT_EQ (jwt.generateKeyPair ("k1", JwtAlg::HS256).code, ErrorCode::Ok);
-
 		std::string token;
-		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid ("k1").claim ("sample", "test").sign (token).code,
+		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid (kKid).claim ("sample", "test").sign (token).code,
 		           ErrorCode::Ok);
-		ASSERT_EQ (jwt.removeKey ("k1").code, ErrorCode::Ok);
+		ASSERT_EQ (jwt.removeKey (kKid).code, ErrorCode::Ok);
 
 		Verifier verifier;
 		auto verifyError = jwt.verify (token, verifier);
@@ -413,19 +443,16 @@ namespace ipb::http::jwt
 
 	TEST_F (JwtTester, SaveKeyFunctionsExistAndReturnOk)
 	{
-		ASSERT_EQ (jwt.generateKeyPair ("k1", JwtAlg::HS256).code, ErrorCode::Ok);
-		EXPECT_EQ (jwt.savePrivateKeyToPemFile ("k1", "k1.priv.pem").code, ErrorCode::Ok);
-		EXPECT_EQ (jwt.savePublicKeyToPemFile ("k1", "k1.pub.pem").code, ErrorCode::Ok);
+		EXPECT_EQ (jwt.savePrivateKeyToPemFile (kKid, "k1.priv.pem").code, ErrorCode::Ok);
+		EXPECT_EQ (jwt.savePublicKeyToPemFile (kKid, "k1.pub.pem").code, ErrorCode::Ok);
 	}
 
 	TEST_F (JwtTester, ClaimWithCStringLiteralIsStoredAsString)
 	{
-		ASSERT_EQ (jwt.generateKeyPair ("k1", JwtAlg::HS256).code, ErrorCode::Ok);
-
 		std::string token;
 		ASSERT_EQ (jwt.token()
 		               .alg (JwtAlg::HS256)
-		               .kid ("k1")
+		               .kid (kKid)
 		               .claim ("sample", "test")
 		               .expiresAt (static_cast<int64_t> (std::time (nullptr)) + 3600)
 		               .sign (token)
@@ -439,6 +466,7 @@ namespace ipb::http::jwt
 
 	TEST_F (JwtTester, EnsureKeyPairInBinaryDirCreatesFilesWhenMissing)
 	{
+		crypto.resetCounters();
 		const auto privFile = "jwt-test-create.private.pem";
 		const auto pubFile  = "jwt-test-create.public.pem";
 		const auto binDir   = testutil::executableDir();
@@ -464,6 +492,7 @@ namespace ipb::http::jwt
 
 	TEST_F (JwtTester, EnsureKeyPairInBinaryDirLoadsFilesWhenPresent)
 	{
+		crypto.resetCounters();
 		const auto privFile = "jwt-test-load.private.pem";
 		const auto pubFile  = "jwt-test-load.public.pem";
 		const auto binDir   = testutil::executableDir();
