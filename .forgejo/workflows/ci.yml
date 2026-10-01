@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: docker
+    container:
+      image: node:22-trixie    # Debian 13 (gcc 14), as the devcontainer. Node is needed by the actions
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the toolchain
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake python3-venv
+          python3 -m venv /opt/conan-env
+          /opt/conan-env/bin/pip install --no-cache-dir "conan>=2.0"
+          echo "/opt/conan-env/bin" >> "$GITHUB_PATH"
+
+      - name: Cache the Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2/p
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py') }}
+
+      - name: Configure Conan
+        run: conan profile detect --force
+
+      - name: Unit tests
+        run: |
+          conan install . --build=missing -s compiler.cppstd=20 -o build_tests=True
+          cmake --preset conan-release
+          cmake --build --preset conan-release
+          ctest --preset conan-release --output-on-failure
+
+      - name: Conan package (shared, with test_package)
+        run: conan create . --build=missing -s compiler.cppstd=20
