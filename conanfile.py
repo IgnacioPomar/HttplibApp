@@ -54,6 +54,10 @@ class HttplibAppConan(ConanFile):
             self.options["wolfssl"].opensslextra = True
             self.options["wolfssl"].opensslall = True
 
+    def package_id(self):
+        # Building the tests does not change the packaged library
+        del self.info.options.build_tests
+
     def validate(self):
         check_min_cppstd(self, 20)
 
