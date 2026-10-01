@@ -18,7 +18,7 @@ class HttplibAppConan(ConanFile):
         "tls": ["none", "wolfssl", "openssl"],
     }
     default_options = {
-        "shared": False,
+        "shared": True,
         "fPIC": True,
         "build_tests": False,
         "tls": "none",

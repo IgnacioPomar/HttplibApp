@@ -28,10 +28,19 @@ target_include_directories(HttplibApp PUBLIC
 )
 target_link_libraries(HttplibApp PUBLIC httplib::httplib PRIVATE botan::botan)
 
+# Before 1.0 a minor version may break the ABI: libHttplibApp.so.0.1 -> libHttplibApp.so.0.1.0
+if(PROJECT_VERSION_MAJOR EQUAL 0)
+    set(HTTPLIBAPP_SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+else()
+    set(HTTPLIBAPP_SOVERSION ${PROJECT_VERSION_MAJOR})
+endif()
+
 # Only the symbols marked with HAPP_API are exported from the shared library
 set_target_properties(HttplibApp PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${HTTPLIBAPP_SOVERSION}
 )
 if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Neither export the symbols of the static libraries linked in (Botan)
