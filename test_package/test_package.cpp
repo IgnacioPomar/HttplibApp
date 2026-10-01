@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include "HttplibApp/LibraryInfo.h"
 #include "HttplibApp/Route.h"
 
 class Ctx : public ipb::http::ICtx
@@ -17,6 +18,10 @@ class Ctx : public ipb::http::ICtx
 
 int main ()
 {
+	const ipb::http::LibraryInfo &info = ipb::http::getLibraryInfo();
+	std::cout << info.name << " " << info.version << ", built " << info.buildDate << " (compiled with "
+	          << HTTPLIBAPP_VERSION << "): " << info.description << std::endl;
+
 	ipb::http::Router router;
 	router.add (ipb::http::HttpMethod::GET, "/users/<id:int>",
 	            [] (ipb::http::ICtx &)

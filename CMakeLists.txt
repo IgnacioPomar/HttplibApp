@@ -26,11 +26,23 @@ find_package(httplib REQUIRED)
 # Crypto for JWT
 find_package(botan REQUIRED)
 
-add_library(HttplibApp
+set(HTTPLIBAPP_SOURCES
     src/Jwt.cpp
+    src/LibraryInfo.cpp
     src/Route.cpp
 )
+
+add_library(HttplibApp ${HTTPLIBAPP_SOURCES})
 add_library(HttplibApp::HttplibApp ALIAS HttplibApp)
+
+# The build date (getLibraryInfo) is taken when LibraryInfo.cpp is compiled: recompile it on any change
+file(GLOB HTTPLIBAPP_HEADERS CONFIGURE_DEPENDS include/HttplibApp/*.h src/*.h)
+set(HTTPLIBAPP_OTHER_SOURCES ${HTTPLIBAPP_SOURCES})
+list(REMOVE_ITEM HTTPLIBAPP_OTHER_SOURCES src/LibraryInfo.cpp)
+list(TRANSFORM HTTPLIBAPP_OTHER_SOURCES PREPEND ${CMAKE_CURRENT_SOURCE_DIR}/)
+set_source_files_properties(src/LibraryInfo.cpp PROPERTIES
+    OBJECT_DEPENDS "${HTTPLIBAPP_OTHER_SOURCES};${HTTPLIBAPP_HEADERS}"
+)
 
 target_include_directories(HttplibApp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -68,6 +80,9 @@ generate_export_header(HttplibApp
     EXPORT_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/include/HttplibApp/httplib_app_exportcfg.h
 )
 
+# Name, description and version of project(), as macros (HTTPLIBAPP_VERSION...)
+configure_file(cmake/HttplibAppVersion.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/HttplibApp/HttplibAppVersion.h @ONLY)
+
 install(TARGETS HttplibApp)
 install(DIRECTORY include/ ${CMAKE_CURRENT_BINARY_DIR}/include/ DESTINATION include)
 
@@ -79,6 +94,7 @@ if(HTTPLIBAPP_BUILD_TESTS)
     add_executable(HttplibAppTester
         test/001_Route.cpp
         test/002_Jwt.cpp
+        test/003_LibraryInfo.cpp
     )
     target_link_libraries(HttplibAppTester PRIVATE HttplibApp Catch2::Catch2WithMain)
 

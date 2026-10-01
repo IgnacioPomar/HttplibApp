@@ -29,7 +29,7 @@ class HttplibAppConan(ConanFile):
     }
 
     exports = "VERSION"
-    exports_sources = "VERSION", "CMakeLists.txt", "include/*", "src/*", "test/*"
+    exports_sources = "VERSION", "CMakeLists.txt", "cmake/*", "include/*", "src/*", "test/*"
 
     def set_version(self):
         # Single source of truth: the VERSION file (also read by CMakeLists.txt and the CI)
@@ -76,7 +76,7 @@ class HttplibAppConan(ConanFile):
         cmake_layout(self)
         # Editable mode: consumers use the headers straight from the source tree
         self.cpp.source.includedirs = ["include"]
-        self.cpp.build.includedirs = ["include"]    # Generated export header
+        self.cpp.build.includedirs = ["include"]    # Generated export and version headers
         self.cpp.build.libdirs = ["."]
 
     def generate(self):
