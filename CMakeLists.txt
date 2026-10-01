@@ -58,27 +58,15 @@ else()
     set(HTTPLIBAPP_SOVERSION ${PROJECT_VERSION_MAJOR})
 endif()
 
-# Only the symbols marked with HAPP_API are exported from the shared library
+# The shared library exports all its symbols (default visibility)
 set_target_properties(HttplibApp PROPERTIES
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON
     VERSION ${PROJECT_VERSION}
     SOVERSION ${HTTPLIBAPP_SOVERSION}
 )
 if(BUILD_SHARED_LIBS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # Neither export the symbols of the static libraries linked in (Botan)
+    # But not the symbols of the static libraries linked in (Botan)
     target_link_options(HttplibApp PRIVATE LINKER:--exclude-libs,ALL)
 endif()
-
-# Generated HAPP_API / HAPP_LOCAL / HAPP_DEPRECATED: empty for a static library, export/import for a shared one
-# (HttplibApp_EXPORTS is defined by CMake when building the shared library)
-include(GenerateExportHeader)
-generate_export_header(HttplibApp
-    BASE_NAME HAPP
-    EXPORT_MACRO_NAME HAPP_API
-    NO_EXPORT_MACRO_NAME HAPP_LOCAL
-    EXPORT_FILE_NAME ${CMAKE_CURRENT_BINARY_DIR}/include/HttplibApp/httplib_app_exportcfg.h
-)
 
 # Name, description and version of project(), as macros (HTTPLIBAPP_VERSION...)
 configure_file(cmake/HttplibAppVersion.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/HttplibApp/HttplibAppVersion.h @ONLY)

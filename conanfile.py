@@ -79,7 +79,7 @@ class HttplibAppConan(ConanFile):
         cmake_layout(self)
         # Editable mode: consumers use the headers straight from the source tree
         self.cpp.source.includedirs = ["include"]
-        self.cpp.build.includedirs = ["include"]    # Generated export and version headers
+        self.cpp.build.includedirs = ["include"]    # Generated version header
         self.cpp.build.libdirs = ["."]
 
     def generate(self):

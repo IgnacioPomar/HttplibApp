@@ -83,7 +83,7 @@ The fields of `LibraryInfo` are part of the ABI: adding one is an incompatible c
 ### Numbering: `MAJOR.MINOR.PATCH`
 
 The version follows [Semantic Versioning](https://semver.org), applied to the **public API and the ABI** of the
-shared library: the symbols marked with `HAPP_API`, and the layout of the exported classes.
+shared library: what the installed headers (`include/HttplibApp/`) declare, and the layout of their classes.
 
 **From 1.0.0:**
 

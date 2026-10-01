@@ -16,14 +16,12 @@
 #	include <vector>
 #	include <memory>
 
-#	include "HttplibApp/httplib_app_exportcfg.h"
-
 namespace ipb::http
 {
 	/**
 	 * @brief Interface for context objects passed to route handlers and middleware.
 	 */
-	class HAPP_API ICtx
+	class ICtx
 	{
 		public:
 			virtual ~ICtx ()                                                       = default;
@@ -33,7 +31,7 @@ namespace ipb::http
 	/**
 	 * @brief Interface for the "next" function passed to middleware, allowing them to control the flow of execution.
 	 */
-	class HAPP_API IMiddlewareNext
+	class IMiddlewareNext
 	{
 		public:
 			virtual ~IMiddlewareNext () = default;
@@ -74,46 +72,46 @@ namespace ipb::http
 	class Router
 	{
 		public:
-			HAPP_API Router ();
-			HAPP_API ~Router();
+			Router ();
+			~Router();
 
 			// Non-copyable but movable (like httplib::Server)
 			Router (const Router &)            = delete;
 			Router &operator= (const Router &) = delete;
-			HAPP_API Router (Router &&) noexcept;
-			HAPP_API Router &operator= (Router &&) noexcept;
+			Router (Router &&) noexcept;
+			Router &operator= (Router &&) noexcept;
 
 			/**
 			 * Add new route
 			 */
-			HAPP_API RouteInfo &add (HttpMethod method, std::string_view pattern, RouteHandler handler);
+			RouteInfo &add (HttpMethod method, std::string_view pattern, RouteHandler handler);
 
 			/**
 			 * Add a global middleware executed for all routes.
 			 */
-			HAPP_API bool addMiddleware (Middleware middleware);
+			bool addMiddleware (Middleware middleware);
 
 			/**
 			 * Add middleware to an existing route.
 			 */
-			HAPP_API bool addMiddleware (RouteInfo &routeInfo, Middleware middleware);
+			bool addMiddleware (RouteInfo &routeInfo, Middleware middleware);
 
 			/**
 			 * Match route and extract parameters
 			 */
-			HAPP_API std::optional<std::reference_wrapper<const RouteInfo>>
+			std::optional<std::reference_wrapper<const RouteInfo>>
 			    match (HttpMethod method, std::string_view path, ICtx &context) const;
 
 			/**
 			 * Convert HTTP method string to enum
 			 */
-			HAPP_API static HttpMethod fromMethodString (std::string_view method);
+			static HttpMethod fromMethodString (std::string_view method);
 
 			/**
 			 * Execute route middleware chain and final handler.
 			 * Middleware controls flow by calling (or not calling) `next`.
 			 */
-			HAPP_API void execute (const RouteInfo &routeInfo, ICtx &context) const;
+			void execute (const RouteInfo &routeInfo, ICtx &context) const;
 
 		private:
 			// The data is contained in a PIMPL (Pointer to Implementation)
