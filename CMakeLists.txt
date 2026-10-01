@@ -9,8 +9,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(HTTPLIBAPP_BUILD_TESTS "Build the unit tests" OFF)
 
-# cpp-httplib with wolfSSL (CPPHTTPLIB_WOLFSSL_SUPPORT comes from its package)
+# cpp-httplib. The TLS backend (none, wolfSSL or OpenSSL) is chosen by whoever provides it:
+# CPPHTTPLIB_WOLFSSL_SUPPORT / CPPHTTPLIB_OPENSSL_SUPPORT come with the httplib target
 find_package(httplib REQUIRED)
+# Crypto for JWT
+find_package(botan REQUIRED)
 
 add_library(HttplibApp
     src/Jwt.cpp
@@ -22,7 +25,7 @@ target_include_directories(HttplibApp PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(HttplibApp PUBLIC httplib::httplib)
+target_link_libraries(HttplibApp PUBLIC httplib::httplib PRIVATE botan::botan)
 
 if(BUILD_SHARED_LIBS)
     target_compile_definitions(HttplibApp PUBLIC HAPP_DLL PRIVATE HTTPLIBAPP_EXPORTS)

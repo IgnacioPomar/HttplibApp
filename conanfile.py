@@ -14,15 +14,14 @@ class HttplibAppConan(ConanFile):
         "shared": [True, False],
         "fPIC": [True, False],
         "build_tests": [True, False],
+        # TLS backend of cpp-httplib (HTTPS). With "none" the server is plain HTTP
+        "tls": ["none", "wolfssl", "openssl"],
     }
     default_options = {
         "shared": False,
         "fPIC": True,
         "build_tests": False,
-        # TLS only with wolfSSL (no OpenSSL). The cpp-httplib recipe requires opensslall
-        "cpp-httplib/*:with_wolfssl": True,
-        "wolfssl/*:opensslextra": True,
-        "wolfssl/*:opensslall": True,
+        "tls": "none",
     }
 
     exports_sources = "CMakeLists.txt", "include/*", "src/*", "test/*"
@@ -34,14 +33,22 @@ class HttplibAppConan(ConanFile):
     def configure(self):
         if self.options.shared:
             self.options.rm_safe("fPIC")
+        self.options["cpp-httplib"].with_wolfssl = self.options.tls == "wolfssl"
+        self.options["cpp-httplib"].with_openssl = self.options.tls == "openssl"
+        if self.options.tls == "wolfssl":
+            # Required by the cpp-httplib recipe
+            self.options["wolfssl"].opensslextra = True
+            self.options["wolfssl"].opensslall = True
 
     def validate(self):
         check_min_cppstd(self, 20)
 
     def requirements(self):
-        # cpp-httplib is header-only: its code (and its wolfSSL calls) is compiled in the consumer,
-        # which must get the headers and also link wolfSSL, even if HttplibApp is a shared library
+        # cpp-httplib is header-only: its code (and its TLS calls) is compiled in the consumer,
+        # which must get the headers and also link the TLS library, even if HttplibApp is a shared library
         self.requires("cpp-httplib/0.56.0", transitive_headers=True, transitive_libs=True)
+        # Crypto for JWT (not exposed in the public headers)
+        self.requires("botan/3.13.0")
 
     def build_requirements(self):
         if self.options.build_tests:
@@ -73,6 +80,6 @@ class HttplibAppConan(ConanFile):
         self.cpp_info.libs = ["HttplibApp"]
         self.cpp_info.set_property("cmake_file_name", "HttplibApp")
         self.cpp_info.set_property("cmake_target_name", "HttplibApp::HttplibApp")
-        self.cpp_info.requires = ["cpp-httplib::cpp-httplib"]
+        self.cpp_info.requires = ["cpp-httplib::cpp-httplib", "botan::botan"]
         if self.options.shared:
             self.cpp_info.defines = ["HAPP_DLL"]

@@ -102,10 +102,18 @@ ctest --preset conan-release
 
 Dependencies:
 
-- [`cpp-httplib`](https://github.com/yhirose/cpp-httplib) `0.56.0`, with TLS through **wolfSSL** (`CPPHTTPLIB_WOLFSSL_SUPPORT`, no OpenSSL). The recipe sets `cpp-httplib/*:with_wolfssl=True`, `wolfssl/*:opensslextra=True` and `wolfssl/*:opensslall=True`. Note: wolfSSL is GPL or commercial.
+- [`cpp-httplib`](https://github.com/yhirose/cpp-httplib) `0.56.0`. TLS (HTTPS) is optional, with the Conan option `tls`:
+  - `none` (default): plain HTTP, no TLS library.
+  - `wolfssl`: `CPPHTTPLIB_WOLFSSL_SUPPORT`. The recipe also sets `wolfssl/*:opensslextra=True` and `wolfssl/*:opensslall=True`, required by `cpp-httplib`. Note: wolfSSL is GPL or commercial.
+  - `openssl`: `CPPHTTPLIB_OPENSSL_SUPPORT`.
+- [Botan](https://botan.randombit.net) `3`: crypto for JWT. It is always required, even without TLS.
 - Tests: [Catch2](https://github.com/catchorg/Catch2) `3`.
 
-Without Conan, it can be added to a CMake project with `add_subdirectory` (the tests are off by default). The parent project must provide `find_package(httplib)`:
+```bash
+conan install . --build=missing -s compiler.cppstd=20 -o tls=wolfssl
+```
+
+Without Conan, it can be added to a CMake project with `add_subdirectory` (the tests are off by default). The parent project must provide `find_package(httplib)` (with the TLS backend it wants) and `find_package(botan)`:
 
 ```cmake
 add_subdirectory(HttplibApp)
@@ -134,7 +142,7 @@ target_link_libraries(myTarget PRIVATE HttplibApp::HttplibApp)
 #include "HttplibApp/Jwt.h"
 ```
 
-The options of wolfSSL are default options of the `httplibapp` recipe: if the consumer also requires `cpp-httplib` or `wolfssl` directly, it must set the same options.
+The TLS backend is chosen with `-o httplibapp/*:tls=wolfssl` (or `openssl`). If the consumer also requires `cpp-httplib` or `wolfssl` directly, it must set the same options on them.
 
 `docs/httplib_app_api_draft.cpp` is the draft (not compiled) of the pending integration with `httplib::Server`.
 
