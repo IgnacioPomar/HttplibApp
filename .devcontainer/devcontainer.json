@@ -1,0 +1,46 @@
+{
+  "name": "HttplibApp",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "dev",
+  "workspaceFolder": "/workspace/HttplibApp",
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "conan profile detect --force && if [ -f conanfile.py ]; then conan install . --build=missing -s compiler.cppstd=20 -o build_tests=True && cmake --preset conan-release; fi",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools-extension-pack",
+        "xaver.clang-format",
+        "matepek.vscode-catch2-test-adapter",
+        "hbenl.vscode-test-explorer",
+        "GitHub.github-vscode-theme",
+        "anthropic.claude-code",
+        "openai.chatgpt"
+      ],
+      "settings": {
+        "C_Cpp.default.compilerPath": "/usr/bin/g++",
+        "C_Cpp.default.cStandard": "c17",
+        "C_Cpp.default.cppStandard": "c++20",
+        "C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
+        "cmake.buildDirectory": "${workspaceFolder}/build/Release",
+        "cmake.configureOnOpen": false,
+        "cmake.useCMakePresets": "always",
+        "C_Cpp.default.compileCommands": "${workspaceFolder}/build/Release/compile_commands.json",
+        "editor.defaultFormatter": "xaver.clang-format",
+        "clang-format.style": "file",
+        "[cpp]": {
+          "editor.formatOnSave": true
+        },
+        "[c]": {
+          "editor.formatOnSave": true
+        },
+        "terminal.integrated.env.linux": {
+          "PATH": "/opt/conan-env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        },
+        "testMate.cpp.test.executables": "${workspaceFolder}/build/Release/HttplibAppTester"
+      }
+    }
+  },
+  "remoteUser": "vscode"
+}

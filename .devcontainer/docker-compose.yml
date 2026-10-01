@@ -1,0 +1,32 @@
+name: httplibapp
+
+services:
+  dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace/HttplibApp:cached
+
+      # Personal configuration and credentials
+      - /workspace/shared/claude/dir:/home/vscode/.claude:rw
+      - /workspace/shared/openai/codex:/home/vscode/.codex:rw
+
+      # Build caches
+      - /workspace/shared/cache/conan:/home/vscode/.conan2:rw
+      - /workspace/shared/cache/ccache:/home/vscode/.cache/ccache:rw
+
+      # Git and SSH configuration
+      - ${HOME}/.ssh/ssh-agent.sock:/ssh-agent
+      - ${HOME}/.ssh/id_ed25519.pub:/home/vscode/.ssh/id_ed25519.pub:ro
+      - ${HOME}/.ssh/known_hosts:/home/vscode/.ssh/known_hosts:rw
+      - ${HOME}/.gitconfig:/home/vscode/.gitconfig:ro
+      - /workspace/shared/git/hooks:/home/vscode/git-hooks:ro
+    environment:
+      CONAN_HOME: /home/vscode/.conan2
+      CCACHE_DIR: /home/vscode/.cache/ccache
+      CCACHE_MAXSIZE: 10G
+      SSH_AUTH_SOCK: /ssh-agent
+    working_dir: /workspace
+    user: vscode
+    command: /bin/sh -c "while sleep 1000; do :; done"
