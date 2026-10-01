@@ -1,17 +1,17 @@
-﻿#include <gtest/gtest.h>
-#include "../include/httplib_app.hpp"
-#include "../include/ctx.hpp"
+﻿/*********************************************************************************************
+ *  Description : API DRAFT (not compiled) - specification of the pending cpp-httplib integration
+ *  License     : The unlicense (https://unlicense.org)
+ *	Copyright	(C) 2026  Ignacio Pomar Ballestero
+ *
+ *  Tests written before the code: they describe the planned facade over httplib::Server
+ *  (HttplibApp, Ctx, Next, Middleware, HttpServerConfig). Those headers do not exist yet, and
+ *  they will be hand written (they are not generated). When the API is implemented, this file
+ *  must be translated to Catch2 and moved to test/.
+ ********************************************************************************************/
 
-#ifdef _DEBUG
-#	define END_LIB_STD "d.lib"
-#else
-#	define END_LIB_STD ".lib"
-#endif
-
-// #pragma comment(lib, "HttplibApp" END_LIB_STD)
-
-#pragma comment(lib, "gtest" END_LIB_STD)
-#pragma comment(lib, "gtest_main" END_LIB_STD)
+#include <gtest/gtest.h>
+#include "HttplibApp/httplib_app.hpp"
+#include "HttplibApp/ctx.hpp"
 
 using namespace ipb::http;
 

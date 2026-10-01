@@ -4,7 +4,7 @@
  *  Copyright    (C) 2026  Ignacio Pomar Ballestero
  *********************************************************************************************/
 
-#include "Jwt.h"
+#include "HttplibApp/Jwt.h"
 
 #include <algorithm>
 #include <cmath>

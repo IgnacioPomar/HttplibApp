@@ -58,7 +58,7 @@ This project extends [`yhirose/cpp-httplib`](https://github.com/yhirose/cpp-http
 
 #### Quality
 
-- Unit test suite using GoogleTest covering:
+- Unit test suite using [Catch2](https://github.com/catchorg/Catch2) covering:
   - Basic routes,
   - Typed parameters,
   - Matching priorities,
@@ -73,8 +73,9 @@ This project extends [`yhirose/cpp-httplib`](https://github.com/yhirose/cpp-http
 
 - Full end-to-end integration with `cpp-httplib` server pipeline (documented runtime flow).
 - Automatic middleware + handler execution chain inside the router.
-- Ultra-basic JWT support using **Botan**.
-- Custom in-house JSON library.
+- JWT (`HttplibApp/Jwt.h`): the API and the token workflow are implemented, but there are only fake providers (in the tests). Pending real backends:
+  - Cryptography with **Botan**.
+  - JSON with **glaze**.
 - Trait-based pluggable backends for:
   - JSON,		
   - Cryptography.
@@ -84,9 +85,58 @@ This project extends [`yhirose/cpp-httplib`](https://github.com/yhirose/cpp-http
 
 1. Integrate router + middlewares into the `cpp-httplib` request/response lifecycle.
 2. Add minimal JWT support with Botan (no OpenSSL).
-3. Add an internal JSON library.
+3. JSON provider with glaze.
 4. Design trait/policy-based interchangeable backends (JSON/crypto).
 5. Publish reference examples and adoption guides.
+
+## Build
+
+Requirements: CMake >= 3.23, a C++20 compiler and Conan 2.
+
+```bash
+conan install . --build=missing -s compiler.cppstd=20 -o build_tests=True
+cmake --preset conan-release
+cmake --build --preset conan-release
+ctest --preset conan-release
+```
+
+Dependencies:
+
+- [`cpp-httplib`](https://github.com/yhirose/cpp-httplib) `0.56.0`, with TLS through **wolfSSL** (`CPPHTTPLIB_WOLFSSL_SUPPORT`, no OpenSSL). The recipe sets `cpp-httplib/*:with_wolfssl=True`, `wolfssl/*:opensslextra=True` and `wolfssl/*:opensslall=True`. Note: wolfSSL is GPL or commercial.
+- Tests: [Catch2](https://github.com/catchorg/Catch2) `3`.
+
+Without Conan, it can be added to a CMake project with `add_subdirectory` (the tests are off by default). The parent project must provide `find_package(httplib)`:
+
+```cmake
+add_subdirectory(HttplibApp)
+target_link_libraries(myTarget PRIVATE HttplibApp::HttplibApp)
+```
+
+## Conan package
+
+```bash
+conan create . --build=missing -s compiler.cppstd=20
+```
+
+Usage from another project:
+
+```python
+self.requires("httplibapp/0.1.0")
+```
+
+```cmake
+find_package(HttplibApp REQUIRED)
+target_link_libraries(myTarget PRIVATE HttplibApp::HttplibApp)
+```
+
+```cpp
+#include "HttplibApp/Route.h"
+#include "HttplibApp/Jwt.h"
+```
+
+The options of wolfSSL are default options of the `httplibapp` recipe: if the consumer also requires `cpp-httplib` or `wolfssl` directly, it must set the same options.
+
+`docs/httplib_app_api_draft.cpp` is the draft (not compiled) of the pending integration with `httplib::Server`.
 
 ## Contributing
 

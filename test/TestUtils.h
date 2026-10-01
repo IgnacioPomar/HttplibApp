@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Jwt.h"
+#include "HttplibApp/Jwt.h"
 
 #include <filesystem>
 #include <string>
@@ -29,6 +29,13 @@ namespace ipb::http::testutil
 				return std::filesystem::path (std::wstring (buffer.data(), len)).parent_path();
 			}
 			buffer.resize (buffer.size() * 2);
+		}
+#elif defined(__linux__)
+		std::error_code ec;
+		auto exe = std::filesystem::read_symlink ("/proc/self/exe", ec);
+		if (!ec)
+		{
+			return exe.parent_path();
 		}
 #endif
 		return std::filesystem::current_path();

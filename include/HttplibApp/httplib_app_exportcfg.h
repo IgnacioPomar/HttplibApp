@@ -8,10 +8,9 @@
 #ifndef _HAPP_CFG_H_
 #	define _HAPP_CFG_H_
 
-// If the solution is a dinamic library (dll), we need the next macro
-#	define HAPP_DLL
+// HAPP_DLL is defined by the build system (CMake) when HttplibApp is built as a shared library
 
-// IMPORTANT: the project who exports must have the preprocessor macro STREAMLOGGER_EXPORTS
+// IMPORTANT: the project who exports must have the preprocessor macro HTTPLIBAPP_EXPORTS
 
 // see http://gcc.gnu.org/wiki/Visibility
 
@@ -48,13 +47,15 @@
 #		define HAPP_LOCAL
 #	endif    // HAPP_DLL
 
-#	ifdef __GNUC__
-#		define DEPRECATED __attribute__ ((deprecated))
-#	elif defined(_MSC_VER)
-#		define DEPRECATED __declspec (deprecated)
-#	else
-#		pragma message("WARNING: You need to implement DEPRECATED for this compiler")
-#		define DEPRECATED
+#	ifndef DEPRECATED
+#		ifdef __GNUC__
+#			define DEPRECATED __attribute__ ((deprecated))
+#		elif defined(_MSC_VER)
+#			define DEPRECATED __declspec (deprecated)
+#		else
+#			pragma message("WARNING: You need to implement DEPRECATED for this compiler")
+#			define DEPRECATED
+#		endif
 #	endif
 
 #endif    //_HAPP_CFG_H_

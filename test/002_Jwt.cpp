@@ -4,9 +4,9 @@
  *  Copyright    (C) 2026  Ignacio Pomar Ballestero
  *********************************************************************************************/
 
-#include <gtest/gtest.h>
+#include <catch2/catch_test_macros.hpp>
 
-#include "Jwt.h"
+#include "HttplibApp/Jwt.h"
 #include "JwtTestProviders.h"
 #include "TestUtils.h"
 
@@ -14,11 +14,12 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <stdexcept>
 
 namespace ipb::http::jwt
 {
-	class JwtTester : public ::testing::Test
+	class JwtTester
 	{
 		protected:
 			static constexpr const char *kKid        = "k-startup";
@@ -35,7 +36,7 @@ namespace ipb::http::jwt
 			 * This ensures the first test starts with deterministic key material
 			 * and avoids per-test generation cost when files already exist.
 			 */
-			static void SetUpTestSuite ()
+			static void bootstrapKeyPair ()
 			{
 				FakeCryptoProvider bootstrapCrypto;
 				FakeJsonProvider bootstrapJson;
@@ -55,11 +56,14 @@ namespace ipb::http::jwt
 			 * If files are missing, the helper creates them; otherwise it reuses
 			 * existing files from the executable directory.
 			 */
-			void SetUp () override
+			JwtTester ()
 			{
+				static std::once_flag bootstrapped;
+				std::call_once (bootstrapped, bootstrapKeyPair);
+
 				auto error = testutil::ensureJwtKeyPairInDir (jwt, kKid, JwtAlg::HS256, testutil::executableDir(),
 				                                              kPrivFile, kPublicFile);
-				ASSERT_EQ (error.code, ErrorCode::Ok);
+				REQUIRE (error.code == ErrorCode::Ok);
 			}
 	};
 
@@ -68,7 +72,7 @@ namespace ipb::http::jwt
 	 * The test signs a token with standard claims and checks that
 	 * signature validation and claim extraction both succeed.
 	 */
-	TEST_F (JwtTester, SignAndVerifySuccess)
+	TEST_CASE_METHOD (JwtTester, "SignAndVerifySuccess", "[jwt]")
 	{
 		std::string token;
 		auto signError = jwt.token()
@@ -79,15 +83,15 @@ namespace ipb::http::jwt
 		                     .claim ("sample", "test")
 		                     .expiresAt (static_cast<int64_t> (std::time (nullptr)) + 3600)
 		                     .sign (token);
-		ASSERT_EQ (signError.code, ErrorCode::Ok);
-		ASSERT_FALSE (token.empty());
+		REQUIRE (signError.code == ErrorCode::Ok);
+		REQUIRE_FALSE (token.empty());
 
 		Verifier verifier;
 		auto verifyError = jwt.verify (token, verifier);
-		ASSERT_EQ (verifyError.code, ErrorCode::Ok);
-		ASSERT_TRUE (verifier.ok());
-		EXPECT_EQ (verifier.claimString ("sample").value_or (""), "test");
-		EXPECT_EQ (verifier.claimString ("iss").value_or (""), "auth0");
+		REQUIRE (verifyError.code == ErrorCode::Ok);
+		REQUIRE (verifier.ok());
+		CHECK (verifier.claimString ("sample").value_or ("") == "test");
+		CHECK (verifier.claimString ("iss").value_or ("") == "auth0");
 	}
 
 	/**
@@ -95,18 +99,17 @@ namespace ipb::http::jwt
 	 * After mutating the token payload/signature bytes, verification
 	 * must fail with SignatureMismatch.
 	 */
-	TEST_F (JwtTester, VerifyFailsOnSignatureMismatch)
+	TEST_CASE_METHOD (JwtTester, "VerifyFailsOnSignatureMismatch", "[jwt]")
 	{
 		std::string token;
-		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid (kKid).claim ("sample", "test").sign (token).code,
-		           ErrorCode::Ok);
-		ASSERT_FALSE (token.empty());
+		REQUIRE (jwt.token().alg (JwtAlg::HS256).kid (kKid).claim ("sample", "test").sign (token).code == ErrorCode::Ok);
+		REQUIRE_FALSE (token.empty());
 		token.back() = (token.back() == 'A') ? 'B' : 'A';
 
 		Verifier verifier;
 		auto verifyError = jwt.verify (token, verifier);
-		EXPECT_EQ (verifyError.code, ErrorCode::SignatureMismatch);
-		EXPECT_FALSE (verifier.ok());
+		CHECK (verifyError.code == ErrorCode::SignatureMismatch);
+		CHECK_FALSE (verifier.ok());
 	}
 
 	/**
@@ -114,17 +117,17 @@ namespace ipb::http::jwt
 	 * A token signed correctly but with an unexpected issuer must be
 	 * rejected with InvalidIssuer.
 	 */
-	TEST_F (JwtTester, VerifyChecksIssuerPolicy)
+	TEST_CASE_METHOD (JwtTester, "VerifyChecksIssuerPolicy", "[jwt]")
 	{
 		options.policy.expectedIss = "auth0";
 		jwt.setOptions (options);
 
 		std::string token;
-		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid (kKid).issuer ("other").sign (token).code, ErrorCode::Ok);
+		REQUIRE (jwt.token().alg (JwtAlg::HS256).kid (kKid).issuer ("other").sign (token).code == ErrorCode::Ok);
 
 		Verifier verifier;
 		auto verifyError = jwt.verify (token, verifier);
-		EXPECT_EQ (verifyError.code, ErrorCode::InvalidIssuer);
+		CHECK (verifyError.code == ErrorCode::InvalidIssuer);
 	}
 
 	/**
@@ -132,26 +135,25 @@ namespace ipb::http::jwt
 	 * Once the signing key is removed, previously signed tokens can no
 	 * longer be verified because the kid cannot be resolved.
 	 */
-	TEST_F (JwtTester, RemoveKeyInvalidatesFutureVerification)
+	TEST_CASE_METHOD (JwtTester, "RemoveKeyInvalidatesFutureVerification", "[jwt]")
 	{
 		std::string token;
-		ASSERT_EQ (jwt.token().alg (JwtAlg::HS256).kid (kKid).claim ("sample", "test").sign (token).code,
-		           ErrorCode::Ok);
-		ASSERT_EQ (jwt.removeKey (kKid).code, ErrorCode::Ok);
+		REQUIRE (jwt.token().alg (JwtAlg::HS256).kid (kKid).claim ("sample", "test").sign (token).code == ErrorCode::Ok);
+		REQUIRE (jwt.removeKey (kKid).code == ErrorCode::Ok);
 
 		Verifier verifier;
 		auto verifyError = jwt.verify (token, verifier);
-		EXPECT_EQ (verifyError.code, ErrorCode::KeyNotFound);
+		CHECK (verifyError.code == ErrorCode::KeyNotFound);
 	}
 
 	/**
 	 * Verifies that PEM persistence methods are callable and succeed
 	 * for a key that is already available in the Jwt instance.
 	 */
-	TEST_F (JwtTester, SaveKeyFunctionsExistAndReturnOk)
+	TEST_CASE_METHOD (JwtTester, "SaveKeyFunctionsExistAndReturnOk", "[jwt]")
 	{
-		EXPECT_EQ (jwt.savePrivateKeyToPemFile (kKid, "k1.priv.pem").code, ErrorCode::Ok);
-		EXPECT_EQ (jwt.savePublicKeyToPemFile (kKid, "k1.pub.pem").code, ErrorCode::Ok);
+		CHECK (jwt.savePrivateKeyToPemFile (kKid, "k1.priv.pem").code == ErrorCode::Ok);
+		CHECK (jwt.savePublicKeyToPemFile (kKid, "k1.pub.pem").code == ErrorCode::Ok);
 	}
 
 	/**
@@ -159,21 +161,20 @@ namespace ipb::http::jwt
 	 * A literal passed to claim(...) must be encoded and recovered as
 	 * a string claim value during verification.
 	 */
-	TEST_F (JwtTester, ClaimWithCStringLiteralIsStoredAsString)
+	TEST_CASE_METHOD (JwtTester, "ClaimWithCStringLiteralIsStoredAsString", "[jwt]")
 	{
 		std::string token;
-		ASSERT_EQ (jwt.token()
+		REQUIRE (jwt.token()
 		               .alg (JwtAlg::HS256)
 		               .kid (kKid)
 		               .claim ("sample", "test")
 		               .expiresAt (static_cast<int64_t> (std::time (nullptr)) + 3600)
 		               .sign (token)
-		               .code,
-		           ErrorCode::Ok);
+		               .code == ErrorCode::Ok);
 
 		Verifier verifier;
-		ASSERT_EQ (jwt.verify (token, verifier).code, ErrorCode::Ok);
-		EXPECT_EQ (verifier.claimString ("sample").value_or (""), "test");
+		REQUIRE (jwt.verify (token, verifier).code == ErrorCode::Ok);
+		CHECK (verifier.claimString ("sample").value_or ("") == "test");
 	}
 
 	/**
@@ -181,7 +182,7 @@ namespace ipb::http::jwt
 	 * This validates testutil::ensureJwtKeyPairInDir(...) in the branch
 	 * where files are missing: it must generate and save the key pair.
 	 */
-	TEST_F (JwtTester, EnsureKeyPairInBinaryDirCreatesFilesWhenMissing)
+	TEST_CASE_METHOD (JwtTester, "EnsureKeyPairInBinaryDirCreatesFilesWhenMissing", "[jwt]")
 	{
 		crypto.resetCounters();
 		const auto privFile = "jwt-test-create.private.pem";
@@ -194,14 +195,14 @@ namespace ipb::http::jwt
 		std::filesystem::remove (pubPath, ec);
 
 		auto error = testutil::ensureJwtKeyPairInDir (jwt, "k-startup", JwtAlg::HS256, binDir, privFile, pubFile);
-		ASSERT_EQ (error.code, ErrorCode::Ok);
-		EXPECT_TRUE (std::filesystem::exists (privPath));
-		EXPECT_TRUE (std::filesystem::exists (pubPath));
-		EXPECT_EQ (crypto.generateCalls, 1);
-		EXPECT_EQ (crypto.savePrivateCalls, 1);
-		EXPECT_EQ (crypto.savePublicCalls, 1);
-		EXPECT_EQ (crypto.loadPrivateCalls, 0);
-		EXPECT_EQ (crypto.loadPublicCalls, 0);
+		REQUIRE (error.code == ErrorCode::Ok);
+		CHECK (std::filesystem::exists (privPath));
+		CHECK (std::filesystem::exists (pubPath));
+		CHECK (crypto.generateCalls == 1);
+		CHECK (crypto.savePrivateCalls == 1);
+		CHECK (crypto.savePublicCalls == 1);
+		CHECK (crypto.loadPrivateCalls == 0);
+		CHECK (crypto.loadPublicCalls == 0);
 
 		std::filesystem::remove (privPath, ec);
 		std::filesystem::remove (pubPath, ec);
@@ -212,7 +213,7 @@ namespace ipb::http::jwt
 	 * This validates testutil::ensureJwtKeyPairInDir(...) in the branch
 	 * where files exist: it must load keys without regenerating/resaving.
 	 */
-	TEST_F (JwtTester, EnsureKeyPairInBinaryDirLoadsFilesWhenPresent)
+	TEST_CASE_METHOD (JwtTester, "EnsureKeyPairInBinaryDirLoadsFilesWhenPresent", "[jwt]")
 	{
 		crypto.resetCounters();
 		const auto privFile = "jwt-test-load.private.pem";
@@ -223,19 +224,19 @@ namespace ipb::http::jwt
 		{
 			std::ofstream privOut (privPath, std::ios::binary | std::ios::trunc);
 			std::ofstream pubOut (pubPath, std::ios::binary | std::ios::trunc);
-			ASSERT_TRUE (privOut.good());
-			ASSERT_TRUE (pubOut.good());
+			REQUIRE (privOut.good());
+			REQUIRE (pubOut.good());
 		}
 
 		auto error = testutil::ensureJwtKeyPairInDir (jwt, "k-startup", JwtAlg::HS256, binDir, privFile, pubFile);
-		ASSERT_EQ (error.code, ErrorCode::Ok);
-		EXPECT_EQ (crypto.generateCalls, 0);
-		EXPECT_EQ (crypto.savePrivateCalls, 0);
-		EXPECT_EQ (crypto.savePublicCalls, 0);
-		EXPECT_EQ (crypto.loadPrivateCalls, 1);
-		EXPECT_EQ (crypto.loadPublicCalls, 1);
-		EXPECT_EQ (std::filesystem::path (crypto.lastPrivatePath).filename().string(), privFile);
-		EXPECT_EQ (std::filesystem::path (crypto.lastPublicPath).filename().string(), pubFile);
+		REQUIRE (error.code == ErrorCode::Ok);
+		CHECK (crypto.generateCalls == 0);
+		CHECK (crypto.savePrivateCalls == 0);
+		CHECK (crypto.savePublicCalls == 0);
+		CHECK (crypto.loadPrivateCalls == 1);
+		CHECK (crypto.loadPublicCalls == 1);
+		CHECK (std::filesystem::path (crypto.lastPrivatePath).filename().string() == privFile);
+		CHECK (std::filesystem::path (crypto.lastPublicPath).filename().string() == pubFile);
 
 		std::error_code ec;
 		std::filesystem::remove (privPath, ec);

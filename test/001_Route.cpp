@@ -4,8 +4,8 @@
  *	Copyright	(C) 2026  Ignacio Pomar Ballestero
  ********************************************************************************************/
 
-#include <gtest/gtest.h>
-#include "Route.h"
+#include <catch2/catch_test_macros.hpp>
+#include "HttplibApp/Route.h"
 #include <string>
 #include <unordered_map>
 
@@ -55,57 +55,52 @@ using namespace ipb::http;
 // Test Fixtures
 // ============================================================================
 
-class RouterTest : public ::testing::Test
+class RouterTest
 {
 	protected:
 		Router router;
 		MockCtx ctx;
 
-		static void dummyHandler (ICtx &ctx) {}
-
-		void SetUp () override
-		{
-			ctx.clear();
-		}
+		static void dummyHandler (ICtx &) {}
 };
 
 // ============================================================================
 // Router::add() Tests - Rutas Básicas
 // ============================================================================
 
-TEST_F (RouterTest, AddSimpleRoute)
+TEST_CASE_METHOD (RouterTest, "AddSimpleRoute", "[route]")
 {
 	router.add (HttpMethod::GET, "/users", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/users", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().pattern, "/users");
-	EXPECT_EQ (result.value().get().method, HttpMethod::GET);
-	EXPECT_TRUE (ctx.empty());
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().pattern == "/users");
+	CHECK (result.value().get().method == HttpMethod::GET);
+	CHECK (ctx.empty());
 }
 
-TEST_F (RouterTest, AddRootPath)
+TEST_CASE_METHOD (RouterTest, "AddRootPath", "[route]")
 {
 	router.add (HttpMethod::GET, "/", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().pattern, "/");
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().pattern == "/");
 }
 
-TEST_F (RouterTest, AddNestedRoute)
+TEST_CASE_METHOD (RouterTest, "AddNestedRoute", "[route]")
 {
 	router.add (HttpMethod::GET, "/api/v1/users/list", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/api/v1/users/list", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().pattern, "/api/v1/users/list");
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().pattern == "/api/v1/users/list");
 }
 
-TEST_F (RouterTest, AddRouteWithMiddleware)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithMiddleware", "[route]")
 {
 	auto &route = router.add (HttpMethod::GET, "/protected", dummyHandler);
 
@@ -117,15 +112,15 @@ TEST_F (RouterTest, AddRouteWithMiddleware)
 
 	auto result = router.match (HttpMethod::GET, "/protected", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().middlewares.size(), 1);
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().middlewares.size() == 1);
 }
 
 // ============================================================================
 // Router::add() Tests - Múltiples Métodos
 // ============================================================================
 
-TEST_F (RouterTest, AddSamePathDifferentMethods)
+TEST_CASE_METHOD (RouterTest, "AddSamePathDifferentMethods", "[route]")
 {
 	router.add (HttpMethod::GET, "/users", dummyHandler);
 	router.add (HttpMethod::POST, "/users", dummyHandler);
@@ -138,18 +133,18 @@ TEST_F (RouterTest, AddSamePathDifferentMethods)
 	auto put_result    = router.match (HttpMethod::PUT, "/users", ctx3);
 	auto delete_result = router.match (HttpMethod::DELETE_, "/users", ctx4);
 
-	ASSERT_TRUE (get_result.has_value());
-	ASSERT_TRUE (post_result.has_value());
-	ASSERT_TRUE (put_result.has_value());
-	ASSERT_TRUE (delete_result.has_value());
+	REQUIRE (get_result.has_value());
+	REQUIRE (post_result.has_value());
+	REQUIRE (put_result.has_value());
+	REQUIRE (delete_result.has_value());
 
-	EXPECT_EQ (get_result.value().get().method, HttpMethod::GET);
-	EXPECT_EQ (post_result.value().get().method, HttpMethod::POST);
-	EXPECT_EQ (put_result.value().get().method, HttpMethod::PUT);
-	EXPECT_EQ (delete_result.value().get().method, HttpMethod::DELETE_);
+	CHECK (get_result.value().get().method == HttpMethod::GET);
+	CHECK (post_result.value().get().method == HttpMethod::POST);
+	CHECK (put_result.value().get().method == HttpMethod::PUT);
+	CHECK (delete_result.value().get().method == HttpMethod::DELETE_);
 }
 
-TEST_F (RouterTest, AddMethodANY)
+TEST_CASE_METHOD (RouterTest, "AddMethodANY", "[route]")
 {
 	router.add (HttpMethod::ANY, "/health", dummyHandler);
 
@@ -158,12 +153,12 @@ TEST_F (RouterTest, AddMethodANY)
 	auto post_result = router.match (HttpMethod::POST, "/health", ctx2);
 	auto put_result  = router.match (HttpMethod::PUT, "/health", ctx3);
 
-	EXPECT_TRUE (get_result.has_value());
-	EXPECT_TRUE (post_result.has_value());
-	EXPECT_TRUE (put_result.has_value());
+	CHECK (get_result.has_value());
+	CHECK (post_result.has_value());
+	CHECK (put_result.has_value());
 }
 
-TEST_F (RouterTest, SpecificMethodOverridesANY)
+TEST_CASE_METHOD (RouterTest, "SpecificMethodOverridesANY", "[route]")
 {
 	router.add (HttpMethod::ANY, "/api", dummyHandler);
 	router.add (HttpMethod::POST, "/api", dummyHandler);
@@ -172,186 +167,186 @@ TEST_F (RouterTest, SpecificMethodOverridesANY)
 	auto get_result  = router.match (HttpMethod::GET, "/api", ctx1);
 	auto post_result = router.match (HttpMethod::POST, "/api", ctx2);
 
-	ASSERT_TRUE (get_result.has_value());
-	ASSERT_TRUE (post_result.has_value());
+	REQUIRE (get_result.has_value());
+	REQUIRE (post_result.has_value());
 
 	// POST debe usar la ruta específica, no ANY
-	EXPECT_EQ (post_result.value().get().method, HttpMethod::POST);
+	CHECK (post_result.value().get().method == HttpMethod::POST);
 	// GET debe usar ANY
-	EXPECT_EQ (get_result.value().get().method, HttpMethod::ANY);
+	CHECK (get_result.value().get().method == HttpMethod::ANY);
 }
 
 // ============================================================================
 // Router::add() Tests - Parámetros Genéricos
 // ============================================================================
 
-TEST_F (RouterTest, AddRouteWithGenericParameter)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithGenericParameter", "[route]")
 {
 	router.add (HttpMethod::GET, "/users/<id>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/users/123", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	ASSERT_EQ (ctx.size(), 1);
-	EXPECT_EQ (ctx.get ("id").value(), "123");
+	REQUIRE (result.has_value());
+	REQUIRE (ctx.size() == 1);
+	CHECK (ctx.get ("id").value() == "123");
 }
 
-TEST_F (RouterTest, AddRouteWithMultipleGenericParameters)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithMultipleGenericParameters", "[route]")
 {
 	router.add (HttpMethod::GET, "/users/<userId>/posts/<postId>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/users/42/posts/100", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	ASSERT_EQ (ctx.size(), 2);
-	EXPECT_EQ (ctx.get ("userId").value(), "42");
-	EXPECT_EQ (ctx.get ("postId").value(), "100");
+	REQUIRE (result.has_value());
+	REQUIRE (ctx.size() == 2);
+	CHECK (ctx.get ("userId").value() == "42");
+	CHECK (ctx.get ("postId").value() == "100");
 }
 
 // ============================================================================
 // Router::add() Tests - Parámetros Tipados
 // ============================================================================
 
-TEST_F (RouterTest, AddRouteWithIntParameter)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithIntParameter", "[route]")
 {
 	router.add (HttpMethod::GET, "/users/<id:int>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/users/123", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (ctx.get ("id").value(), "123");
+	REQUIRE (result.has_value());
+	CHECK (ctx.get ("id").value() == "123");
 
 	// No debe matchear con string
 	ctx.clear();
 	auto no_match = router.match (HttpMethod::GET, "/users/john", ctx);
-	EXPECT_FALSE (no_match.has_value());
+	CHECK_FALSE (no_match.has_value());
 }
 
-TEST_F (RouterTest, AddRouteWithStringParameter)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithStringParameter", "[route]")
 {
 	router.add (HttpMethod::GET, "/users/<alias:string>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/users/john", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (ctx.get ("alias").value(), "john");
+	REQUIRE (result.has_value());
+	CHECK (ctx.get ("alias").value() == "john");
 }
 
-TEST_F (RouterTest, AddRouteWithUUIDParameter)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithUUIDParameter", "[route]")
 {
 	router.add (HttpMethod::GET, "/resources/<id:uuid>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/resources/550e8400-e29b-41d4-a716-446655440000", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (ctx.get ("id").value(), "550e8400-e29b-41d4-a716-446655440000");
+	REQUIRE (result.has_value());
+	CHECK (ctx.get ("id").value() == "550e8400-e29b-41d4-a716-446655440000");
 
 	// No debe matchear con formato incorrecto
 	ctx.clear();
 	auto no_match = router.match (HttpMethod::GET, "/resources/not-a-uuid", ctx);
-	EXPECT_FALSE (no_match.has_value());
+	CHECK_FALSE (no_match.has_value());
 }
 
-TEST_F (RouterTest, AddRouteWithFloatParameter)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithFloatParameter", "[route]")
 {
 	router.add (HttpMethod::GET, "/values/<amount:float>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/values/123.45", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (ctx.get ("amount").value(), "123.45");
+	REQUIRE (result.has_value());
+	CHECK (ctx.get ("amount").value() == "123.45");
 
 	// También debe matchear enteros
 	ctx.clear();
 	auto int_result = router.match (HttpMethod::GET, "/values/100", ctx);
-	ASSERT_TRUE (int_result.has_value());
+	REQUIRE (int_result.has_value());
 }
 
-TEST_F (RouterTest, AddRouteWithMixedTypedParameters)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithMixedTypedParameters", "[route]")
 {
 	router.add (HttpMethod::GET, "/users/<userId:int>/posts/<slug:string>/comments/<commentId:int>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/users/42/posts/my-article/comments/99", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	ASSERT_EQ (ctx.size(), 3);
-	EXPECT_EQ (ctx.get ("userId").value(), "42");
-	EXPECT_EQ (ctx.get ("slug").value(), "my-article");
-	EXPECT_EQ (ctx.get ("commentId").value(), "99");
+	REQUIRE (result.has_value());
+	REQUIRE (ctx.size() == 3);
+	CHECK (ctx.get ("userId").value() == "42");
+	CHECK (ctx.get ("slug").value() == "my-article");
+	CHECK (ctx.get ("commentId").value() == "99");
 }
 
 // ============================================================================
 // Router::match() Tests - Prioridades
 // ============================================================================
 
-TEST_F (RouterTest, LiteralHasPriorityOverParameter)
+TEST_CASE_METHOD (RouterTest, "LiteralHasPriorityOverParameter", "[route]")
 {
 	router.add (HttpMethod::GET, "/users/<id:int>", dummyHandler);
 	router.add (HttpMethod::GET, "/users/new", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/users/new", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().pattern, "/users/new");
-	EXPECT_TRUE (ctx.empty());    // No debe capturar "new" como parámetro
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().pattern == "/users/new");
+	CHECK (ctx.empty());    // No debe capturar "new" como parámetro
 }
 
-TEST_F (RouterTest, IntParameterHasPriorityOverString)
+TEST_CASE_METHOD (RouterTest, "IntParameterHasPriorityOverString", "[route]")
 {
 	router.add (HttpMethod::GET, "/users/<id:int>", dummyHandler);
 	router.add (HttpMethod::GET, "/users/<alias:string>", dummyHandler);
 
 	// Número debe matchear con int primero
 	auto int_result = router.match (HttpMethod::GET, "/users/123", ctx);
-	ASSERT_TRUE (int_result.has_value());
-	EXPECT_EQ (int_result.value().get().pattern, "/users/<id:int>");
-	EXPECT_EQ (ctx.get ("id").value(), "123");
+	REQUIRE (int_result.has_value());
+	CHECK (int_result.value().get().pattern == "/users/<id:int>");
+	CHECK (ctx.get ("id").value() == "123");
 
 	ctx.clear();
 
 	// String no numérico debe matchear con string
 	auto string_result = router.match (HttpMethod::GET, "/users/john", ctx);
-	ASSERT_TRUE (string_result.has_value());
-	EXPECT_EQ (string_result.value().get().pattern, "/users/<alias:string>");
-	EXPECT_EQ (ctx.get ("alias").value(), "john");
+	REQUIRE (string_result.has_value());
+	CHECK (string_result.value().get().pattern == "/users/<alias:string>");
+	CHECK (ctx.get ("alias").value() == "john");
 }
 
-TEST_F (RouterTest, TypedParameterHasPriorityOverGeneric)
+TEST_CASE_METHOD (RouterTest, "TypedParameterHasPriorityOverGeneric", "[route]")
 {
 	router.add (HttpMethod::GET, "/items/<id:int>", dummyHandler);
 	router.add (HttpMethod::GET, "/items/<any>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/items/456", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().pattern, "/items/<id:int>");
-	EXPECT_EQ (ctx.get ("id").value(), "456");
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().pattern == "/items/<id:int>");
+	CHECK (ctx.get ("id").value() == "456");
 }
 
 // ============================================================================
 // Router::match() Tests - Edge Cases
 // ============================================================================
 
-TEST_F (RouterTest, MatchNotFound)
+TEST_CASE_METHOD (RouterTest, "MatchNotFound", "[route]")
 {
 	router.add (HttpMethod::GET, "/users", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/posts", ctx);
 
-	EXPECT_FALSE (result.has_value());
-	EXPECT_TRUE (ctx.empty());
+	CHECK_FALSE (result.has_value());
+	CHECK (ctx.empty());
 }
 
-TEST_F (RouterTest, MatchWrongMethod)
+TEST_CASE_METHOD (RouterTest, "MatchWrongMethod", "[route]")
 {
 	router.add (HttpMethod::GET, "/users", dummyHandler);
 
 	auto result = router.match (HttpMethod::POST, "/users", ctx);
 
-	EXPECT_FALSE (result.has_value());
+	CHECK_FALSE (result.has_value());
 }
 
-TEST_F (RouterTest, MatchTrailingSlashNormalization)
+TEST_CASE_METHOD (RouterTest, "MatchTrailingSlashNormalization", "[route]")
 {
 	router.add (HttpMethod::GET, "/users", dummyHandler);
 
@@ -359,56 +354,56 @@ TEST_F (RouterTest, MatchTrailingSlashNormalization)
 	auto without_slash = router.match (HttpMethod::GET, "/users", ctx1);
 	auto with_slash    = router.match (HttpMethod::GET, "/users/", ctx2);
 
-	EXPECT_TRUE (without_slash.has_value());
-	EXPECT_TRUE (with_slash.has_value());    // Debe normalizar
+	CHECK (without_slash.has_value());
+	CHECK (with_slash.has_value());    // Debe normalizar
 }
 
-TEST_F (RouterTest, MatchParameterWithSpecialCharacters)
+TEST_CASE_METHOD (RouterTest, "MatchParameterWithSpecialCharacters", "[route]")
 {
 	router.add (HttpMethod::GET, "/files/<filename>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/files/document-2024.pdf", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (ctx.get ("filename").value(), "document-2024.pdf");
+	REQUIRE (result.has_value());
+	CHECK (ctx.get ("filename").value() == "document-2024.pdf");
 }
 
-TEST_F (RouterTest, MatchVeryLongPath)
+TEST_CASE_METHOD (RouterTest, "MatchVeryLongPath", "[route]")
 {
 	router.add (HttpMethod::GET, "/a/b/c/d/e/f/g/h/i/j", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/a/b/c/d/e/f/g/h/i/j", ctx);
 
-	ASSERT_TRUE (result.has_value());
+	REQUIRE (result.has_value());
 }
 
 // ============================================================================
 // Router::fromMethodString() Tests
 // ============================================================================
 
-TEST_F (RouterTest, FromMethodString_AllMethods)
+TEST_CASE_METHOD (RouterTest, "FromMethodString_AllMethods", "[route]")
 {
-	EXPECT_EQ (Router::fromMethodString ("GET"), HttpMethod::GET);
-	EXPECT_EQ (Router::fromMethodString ("POST"), HttpMethod::POST);
-	EXPECT_EQ (Router::fromMethodString ("PUT"), HttpMethod::PUT);
-	EXPECT_EQ (Router::fromMethodString ("PATCH"), HttpMethod::PATCH);
-	EXPECT_EQ (Router::fromMethodString ("DELETE"), HttpMethod::DELETE_);
-	EXPECT_EQ (Router::fromMethodString ("OPTIONS"), HttpMethod::OPTIONS);
-	EXPECT_EQ (Router::fromMethodString ("HEAD"), HttpMethod::HEAD);
+	CHECK (Router::fromMethodString ("GET") == HttpMethod::GET);
+	CHECK (Router::fromMethodString ("POST") == HttpMethod::POST);
+	CHECK (Router::fromMethodString ("PUT") == HttpMethod::PUT);
+	CHECK (Router::fromMethodString ("PATCH") == HttpMethod::PATCH);
+	CHECK (Router::fromMethodString ("DELETE") == HttpMethod::DELETE_);
+	CHECK (Router::fromMethodString ("OPTIONS") == HttpMethod::OPTIONS);
+	CHECK (Router::fromMethodString ("HEAD") == HttpMethod::HEAD);
 }
 
-TEST_F (RouterTest, FromMethodString_InvalidDefaultsToGET)
+TEST_CASE_METHOD (RouterTest, "FromMethodString_InvalidDefaultsToGET", "[route]")
 {
-	EXPECT_EQ (Router::fromMethodString ("INVALID"), HttpMethod::GET);
-	EXPECT_EQ (Router::fromMethodString (""), HttpMethod::GET);
-	EXPECT_EQ (Router::fromMethodString ("get"), HttpMethod::GET);    // Case sensitive
+	CHECK (Router::fromMethodString ("INVALID") == HttpMethod::GET);
+	CHECK (Router::fromMethodString ("") == HttpMethod::GET);
+	CHECK (Router::fromMethodString ("get") == HttpMethod::GET);    // Case sensitive
 }
 
 // ============================================================================
 // Router::addMiddleware() Tests
 // ============================================================================
 
-TEST_F (RouterTest, AddMiddlewareToExistingRoute)
+TEST_CASE_METHOD (RouterTest, "AddMiddlewareToExistingRoute", "[route]")
 {
 	auto &route = router.add (HttpMethod::GET, "/users", dummyHandler);
 
@@ -418,18 +413,18 @@ TEST_F (RouterTest, AddMiddlewareToExistingRoute)
 		                                   next.next();
 	                                   });
 
-	EXPECT_TRUE (added);
+	CHECK (added);
 
 	auto result = router.match (HttpMethod::GET, "/users", ctx);
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().middlewares.size(), 1);
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().middlewares.size() == 1);
 }
 
 // ============================================================================
 // Complex Scenario Tests
 // ============================================================================
 
-TEST_F (RouterTest, ComplexRESTAPI)
+TEST_CASE_METHOD (RouterTest, "ComplexRESTAPI", "[route]")
 {
 	// Simular una API REST completa
 	router.add (HttpMethod::GET, "/api/v1/users", dummyHandler);
@@ -443,20 +438,20 @@ TEST_F (RouterTest, ComplexRESTAPI)
 	// Verificar todas las rutas
 	MockCtx ctx1;
 	auto get_users = router.match (HttpMethod::GET, "/api/v1/users", ctx1);
-	EXPECT_TRUE (get_users.has_value());
+	CHECK (get_users.has_value());
 
 	MockCtx ctx2;
 	auto get_user = router.match (HttpMethod::GET, "/api/v1/users/42", ctx2);
-	EXPECT_TRUE (get_user.has_value());
-	EXPECT_EQ (ctx2.get ("id").value(), "42");
+	CHECK (get_user.has_value());
+	CHECK (ctx2.get ("id").value() == "42");
 
 	MockCtx ctx3;
 	auto get_posts = router.match (HttpMethod::GET, "/api/v1/users/42/posts", ctx3);
-	EXPECT_TRUE (get_posts.has_value());
-	EXPECT_EQ (ctx3.get ("id").value(), "42");
+	CHECK (get_posts.has_value());
+	CHECK (ctx3.get ("id").value() == "42");
 }
 
-TEST_F (RouterTest, MultipleRoutersIndependent)
+TEST_CASE_METHOD (RouterTest, "MultipleRoutersIndependent", "[route]")
 {
 	Router router1;
 	Router router2;
@@ -468,41 +463,41 @@ TEST_F (RouterTest, MultipleRoutersIndependent)
 	auto result1 = router1.match (HttpMethod::GET, "/users", ctx1);
 	auto result2 = router1.match (HttpMethod::GET, "/posts", ctx2);
 
-	EXPECT_TRUE (result1.has_value());
-	EXPECT_FALSE (result2.has_value());    // router1 no debe tener /posts
+	CHECK (result1.has_value());
+	CHECK_FALSE (result2.has_value());    // router1 no debe tener /posts
 }
 
-TEST_F (RouterTest, AddRouteWithBase64IdParameter)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithBase64IdParameter", "[route]")
 {
 	router.add (HttpMethod::GET, "/resources/<id:base64id>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStUv", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv");
+	REQUIRE (result.has_value());
+	CHECK (ctx.get ("id").value() == "AbCdEfGhIjKlMnOpQrStUv");
 
 	// Invalid value (contains '+' which is not Base64URL)
 	ctx.clear();
 	auto no_match_invalid_char = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStU+", ctx);
-	EXPECT_FALSE (no_match_invalid_char.has_value());
+	CHECK_FALSE (no_match_invalid_char.has_value());
 
 	// Invalid value (wrong length)
 	ctx.clear();
 	auto no_match_invalid_len = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStU", ctx);
-	EXPECT_FALSE (no_match_invalid_len.has_value());
+	CHECK_FALSE (no_match_invalid_len.has_value());
 }
 
-TEST_F (RouterTest, AddRouteWithBase64IdParameter_Padded)
+TEST_CASE_METHOD (RouterTest, "AddRouteWithBase64IdParameter_Padded", "[route]")
 {
 	router.add (HttpMethod::GET, "/resources/<id:base64id>", dummyHandler);
 
 	auto result = router.match (HttpMethod::GET, "/resources/AbCdEfGhIjKlMnOpQrStUv==", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv==");
+	REQUIRE (result.has_value());
+	CHECK (ctx.get ("id").value() == "AbCdEfGhIjKlMnOpQrStUv==");
 }
 
-TEST_F (RouterTest, Base64IdParameterHasPriorityOverString)
+TEST_CASE_METHOD (RouterTest, "Base64IdParameterHasPriorityOverString", "[route]")
 {
 	router.add (HttpMethod::GET, "/tokens/<id:base64id>", dummyHandler);
 	router.add (HttpMethod::GET, "/tokens/<value:string>", dummyHandler);
@@ -510,12 +505,12 @@ TEST_F (RouterTest, Base64IdParameterHasPriorityOverString)
 	// Base64URL-like token should match base64id before string
 	auto result = router.match (HttpMethod::GET, "/tokens/AbCdEfGhIjKlMnOpQrStUv", ctx);
 
-	ASSERT_TRUE (result.has_value());
-	EXPECT_EQ (result.value().get().pattern, "/tokens/<id:base64id>");
-	EXPECT_EQ (ctx.get ("id").value(), "AbCdEfGhIjKlMnOpQrStUv");
+	REQUIRE (result.has_value());
+	CHECK (result.value().get().pattern == "/tokens/<id:base64id>");
+	CHECK (ctx.get ("id").value() == "AbCdEfGhIjKlMnOpQrStUv");
 }
 
-TEST_F (RouterTest, MiddlewareChainContinuesAndExecutesHandler)
+TEST_CASE_METHOD (RouterTest, "MiddlewareChainContinuesAndExecutesHandler", "[route]")
 {
 	std::vector<std::string> calls;
 
@@ -542,15 +537,15 @@ TEST_F (RouterTest, MiddlewareChainContinuesAndExecutesHandler)
 	                      });
 
 	auto result = router.match (HttpMethod::GET, "/pipeline", ctx);
-	ASSERT_TRUE (result.has_value());
+	REQUIRE (result.has_value());
 
 	router.execute (result.value().get(), ctx);
 
 	const std::vector<std::string> expected = {"mw1.before", "mw2.before", "handler", "mw2.after", "mw1.after"};
-	EXPECT_EQ (calls, expected);
+	CHECK (calls == expected);
 }
 
-TEST_F (RouterTest, MiddlewareCanInterruptChain)
+TEST_CASE_METHOD (RouterTest, "MiddlewareCanInterruptChain", "[route]")
 {
 	std::vector<std::string> calls;
 
@@ -575,15 +570,15 @@ TEST_F (RouterTest, MiddlewareCanInterruptChain)
 	                      });
 
 	auto result = router.match (HttpMethod::GET, "/blocked", ctx);
-	ASSERT_TRUE (result.has_value());
+	REQUIRE (result.has_value());
 
 	router.execute (result.value().get(), ctx);
 
 	const std::vector<std::string> expected = {"mw.block"};
-	EXPECT_EQ (calls, expected);
+	CHECK (calls == expected);
 }
 
-TEST_F (RouterTest, MiddlewareCallingNextTwiceDoesNotRunHandlerTwice)
+TEST_CASE_METHOD (RouterTest, "MiddlewareCallingNextTwiceDoesNotRunHandlerTwice", "[route]")
 {
 	int handler_calls = 0;
 
@@ -601,14 +596,14 @@ TEST_F (RouterTest, MiddlewareCallingNextTwiceDoesNotRunHandlerTwice)
 	                      });
 
 	auto result = router.match (HttpMethod::GET, "/double-next", ctx);
-	ASSERT_TRUE (result.has_value());
+	REQUIRE (result.has_value());
 
 	router.execute (result.value().get(), ctx);
 
-	EXPECT_EQ (handler_calls, 1);
+	CHECK (handler_calls == 1);
 }
 
-TEST_F (RouterTest, GlobalMiddlewaresRunBeforeRouteMiddlewares)
+TEST_CASE_METHOD (RouterTest, "GlobalMiddlewaresRunBeforeRouteMiddlewares", "[route]")
 {
 	std::vector<std::string> calls;
 
@@ -643,16 +638,16 @@ TEST_F (RouterTest, GlobalMiddlewaresRunBeforeRouteMiddlewares)
 	                      });
 
 	auto result = router.match (HttpMethod::GET, "/global-order", ctx);
-	ASSERT_TRUE (result.has_value());
+	REQUIRE (result.has_value());
 
 	router.execute (result.value().get(), ctx);
 
 	const std::vector<std::string> expected = {"g1.before", "g2.before", "r1.before", "handler",
 	                                           "r1.after",  "g2.after",  "g1.after"};
-	EXPECT_EQ (calls, expected);
+	CHECK (calls == expected);
 }
 
-TEST_F (RouterTest, GlobalMiddlewareCanInterruptChain)
+TEST_CASE_METHOD (RouterTest, "GlobalMiddlewareCanInterruptChain", "[route]")
 {
 	std::vector<std::string> calls;
 
@@ -677,10 +672,10 @@ TEST_F (RouterTest, GlobalMiddlewareCanInterruptChain)
 	                      });
 
 	auto result = router.match (HttpMethod::GET, "/global-block", ctx);
-	ASSERT_TRUE (result.has_value());
+	REQUIRE (result.has_value());
 
 	router.execute (result.value().get(), ctx);
 
 	const std::vector<std::string> expected = {"g.block"};
-	EXPECT_EQ (calls, expected);
+	CHECK (calls == expected);
 }

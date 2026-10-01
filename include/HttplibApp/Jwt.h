@@ -19,7 +19,7 @@
 #	include <variant>
 #	include <vector>
 
-#	include "httplib_app_exportcfg.h"
+#	include "HttplibApp/httplib_app_exportcfg.h"
 
 namespace ipb::http::jwt
 {

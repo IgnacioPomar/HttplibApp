@@ -16,7 +16,7 @@
 #	include <vector>
 #	include <memory>
 
-#	include "httplib_app_exportcfg.h"
+#	include "HttplibApp/httplib_app_exportcfg.h"
 
 namespace ipb::http
 {
@@ -26,6 +26,7 @@ namespace ipb::http
 	class ICtx
 	{
 		public:
+			virtual ~ICtx ()                                                       = default;
 			virtual void setParam (std::string_view name, std::string_view value) = 0;
 	};
 
