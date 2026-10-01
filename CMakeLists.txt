@@ -1,6 +1,17 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(HttplibApp VERSION 0.1.0 LANGUAGES CXX)
+# Single source of truth for the version: the VERSION file (MAJOR.MINOR.PATCH), also read by Conan and the CI
+file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/VERSION HTTPLIBAPP_VERSION LIMIT_COUNT 1)
+if(NOT HTTPLIBAPP_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "VERSION must be MAJOR.MINOR.PATCH, not '${HTTPLIBAPP_VERSION}'")
+endif()
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS VERSION)
+
+project(HttplibApp
+    VERSION ${HTTPLIBAPP_VERSION}
+    DESCRIPTION "Extension for cpp-httplib focused on web services: routing and middlewares"
+    LANGUAGES CXX
+)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

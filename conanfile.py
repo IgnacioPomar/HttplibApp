@@ -1,11 +1,15 @@
+import os
+import re
+
 from conan import ConanFile
+from conan.errors import ConanException
 from conan.tools.build import check_min_cppstd
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
+from conan.tools.files import load
 
 
 class HttplibAppConan(ConanFile):
     name = "httplibapp"
-    version = "0.1.0"
     license = "Unlicense"
     description = "Extension for cpp-httplib focused on web services: routing and middlewares"
 
@@ -24,7 +28,17 @@ class HttplibAppConan(ConanFile):
         "tls": "none",
     }
 
-    exports_sources = "CMakeLists.txt", "include/*", "src/*", "test/*"
+    exports = "VERSION"
+    exports_sources = "VERSION", "CMakeLists.txt", "include/*", "src/*", "test/*"
+
+    def set_version(self):
+        # Single source of truth: the VERSION file (also read by CMakeLists.txt and the CI)
+        version = load(self, os.path.join(self.recipe_folder, "VERSION")).strip()
+        if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+            raise ConanException(f"VERSION must be MAJOR.MINOR.PATCH, not '{version}'")
+        if self.version and self.version != version:
+            raise ConanException(f"--version={self.version} does not match the VERSION file ({version})")
+        self.version = version
 
     def config_options(self):
         if self.settings.os == "Windows":
