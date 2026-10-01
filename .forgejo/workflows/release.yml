@@ -1,0 +1,106 @@
+name: Release
+
+# Started by hand from Forgejo (Actions > Release > Run workflow), on main. It asks which part of the version to
+# increase, writes it in the VERSION file, commits and tags it, and publishes the recipe in the Forgejo Conan registry.
+# Only the recipe and its sources are uploaded: each consumer builds the library with its own toolchain (C++ ABI)
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Increase: patch (fixes), minor (new features; breaks the ABI before 1.0), major (breaks the API), none (publish VERSION as it is: first release or retry)'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - none
+        default: patch
+        required: true
+
+jobs:
+  release:
+    runs-on: docker
+    container:
+      image: node:22-trixie    # Debian 13 (gcc 14), as the devcontainer. Node is needed by the actions
+    env:
+      BUMP: ${{ github.event.inputs.bump }}
+      # Credentials of the "forgejo" Conan remote: a user and a token with the write:package scope
+      CONAN_LOGIN_USERNAME_FORGEJO: ${{ secrets.CONAN_USER }}
+      CONAN_PASSWORD_FORGEJO: ${{ secrets.CONAN_TOKEN }}
+    steps:
+      - name: Only from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "A release can only be made from main, not from ${{ github.ref }}"
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # The tags, to check that the new version is not released yet
+
+      - name: Install the toolchain
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake python3-venv
+          python3 -m venv /opt/conan-env
+          /opt/conan-env/bin/pip install --no-cache-dir "conan>=2.0"
+          echo "/opt/conan-env/bin" >> "$GITHUB_PATH"
+
+      - name: New version
+        run: |
+          IFS=. read -r MAJOR MINOR PATCH < VERSION
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+            none) ;;
+            *) echo "Unknown increase: $BUMP"; exit 1 ;;
+          esac
+          VERSION="$MAJOR.$MINOR.$PATCH"
+
+          # An existing tag is only valid to retry the release of this same commit (none)
+          if git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null; then
+            if [ "$BUMP" != none ] || [ "$(git rev-list -n 1 "v$VERSION")" != "$(git rev-parse HEAD)" ]; then
+              echo "v$VERSION is already released"
+              exit 1
+            fi
+          fi
+
+          echo "$VERSION" > VERSION
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Releasing $VERSION ($BUMP)"
+
+      - name: Configure Conan
+        run: |
+          conan profile detect --force
+          conan remote add forgejo "${{ github.server_url }}/api/packages/${{ github.repository_owner }}/conan"
+
+      - name: Unit tests
+        run: |
+          conan install . --build=missing -s compiler.cppstd=20 -o build_tests=True
+          cmake --preset conan-release
+          cmake --build --preset conan-release
+          ctest --preset conan-release --output-on-failure
+
+      - name: Build the packages (shared and static) and run the test_package
+        run: |
+          conan create . --version "$VERSION" --build=missing -s compiler.cppstd=20
+          conan create . --version "$VERSION" --build=missing -s compiler.cppstd=20 -o "httplibapp/*:shared=False"
+
+      # Pushed before uploading: the registry never has a version without its commit and tag in the repository.
+      # If main has moved since the start, the push fails and nothing is published
+      - name: Commit and tag the version
+        run: |
+          # The commit is attributed to the user that started the release
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@noreply.localhost"
+          if ! git diff --quiet VERSION; then
+            git commit -m "Release v$VERSION" VERSION
+          fi
+          if ! git rev-parse -q --verify "refs/tags/v$VERSION" > /dev/null; then
+            git tag -a "v$VERSION" -m "HttplibApp $VERSION"
+          fi
+          git push --atomic origin HEAD:main "v$VERSION"
+
+      - name: Upload the recipe and its sources to the Forgejo Conan registry
+        run: conan upload "httplibapp/$VERSION" -r forgejo --only-recipe --confirm

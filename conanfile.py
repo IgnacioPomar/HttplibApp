@@ -28,6 +28,9 @@ class HttplibAppConan(ConanFile):
         "tls": "none",
     }
 
+    # Only the recipe is published: build it with the consumer's toolchain, without asking for --build
+    build_policy = "missing"
+
     exports = "VERSION"
     exports_sources = "VERSION", "CMakeLists.txt", "cmake/*", "include/*", "src/*", "test/*"
 
