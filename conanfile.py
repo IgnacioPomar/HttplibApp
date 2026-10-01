@@ -58,6 +58,7 @@ class HttplibAppConan(ConanFile):
         cmake_layout(self)
         # Editable mode: consumers use the headers straight from the source tree
         self.cpp.source.includedirs = ["include"]
+        self.cpp.build.includedirs = ["include"]    # Generated export header
         self.cpp.build.libdirs = ["."]
 
     def generate(self):
@@ -81,5 +82,3 @@ class HttplibAppConan(ConanFile):
         self.cpp_info.set_property("cmake_file_name", "HttplibApp")
         self.cpp_info.set_property("cmake_target_name", "HttplibApp::HttplibApp")
         self.cpp_info.requires = ["cpp-httplib::cpp-httplib", "botan::botan"]
-        if self.options.shared:
-            self.cpp_info.defines = ["HAPP_DLL"]

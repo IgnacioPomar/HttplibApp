@@ -23,7 +23,7 @@ namespace ipb::http
 	/**
 	 * @brief Interface for context objects passed to route handlers and middleware.
 	 */
-	class ICtx
+	class HAPP_API ICtx
 	{
 		public:
 			virtual ~ICtx ()                                                       = default;
@@ -33,7 +33,7 @@ namespace ipb::http
 	/**
 	 * @brief Interface for the "next" function passed to middleware, allowing them to control the flow of execution.
 	 */
-	class IMiddlewareNext
+	class HAPP_API IMiddlewareNext
 	{
 		public:
 			virtual ~IMiddlewareNext () = default;
